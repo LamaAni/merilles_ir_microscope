@@ -8,3 +8,8 @@ To configure the environment please make sure you have `python 3.10.x` and pip p
 ```bash
 yapenv -r init
 ```
+
+Then run the kernal install,
+```
+qudi-install-kernel
+```
