@@ -1,7 +1,0 @@
-#!/bin/bash
-REPO_PATH="$(dirname "${BASH_SOURCE[0]}")"
-DUMP="$(type realpath 2>&1)"
-if [ $? -eq 0 ]; then
-    REPO_PATH="$(realpath "$REPO_PATH")"
-fi
-python -m qudi.core --logdir "$REPO_PATH/.local/log"
