@@ -1,5 +1,2 @@
 pyvisa
 pyvisa-py
-
-# Basics for qui
-qudi-core
