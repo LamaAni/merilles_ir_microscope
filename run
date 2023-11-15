@@ -4,4 +4,13 @@ DUMP="$(type realpath 2>&1)"
 if [ $? -eq 0 ]; then
     REPO_PATH="$(realpath "$REPO_PATH")"
 fi
-python -m qudi.core --logdir "$REPO_PATH/.local/log"
+export REPO_PATH
+SEP=":"
+if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+    SEP=";"
+fi
+export PYTHONPATH="$PYTHONPATH$SEP$REPO_PATH"
+(
+    cd $REPO_PATH
+    python -m qudi.core --logdir "$REPO_PATH/.local/log" --config "$REPO_PATH/qudi.yaml"
+)

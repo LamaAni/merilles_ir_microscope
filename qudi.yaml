@@ -1,0 +1,15 @@
+global:
+  startup_modules:
+    - logic_microscope
+  remote_modules_server: null
+  namespace_server_port: 18861
+  force_remote_calls_by_value: True
+  hide_manager_window: False
+  stylesheet: "qdark.qss"
+  default_data_dir: null
+  daily_data_dirs: True
+  extension_paths: []
+
+logic:
+  logic_microscope:
+    module.Class: "microscope.MicroscopeLogic"
