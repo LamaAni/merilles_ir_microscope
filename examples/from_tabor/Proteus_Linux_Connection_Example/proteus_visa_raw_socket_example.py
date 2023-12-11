@@ -20,20 +20,21 @@ import socket
 #
 # -------------------------------------------------
 
+
 def send_scpi_cmd(dev, cmd):
     try:
         resourceManager = visa.ResourceManager()
         session = resourceManager.open_resource(dev)
 
         # Need to define the termination string
-        session.write_termination = '\n'
-        session.read_termination = '\n'
+        session.write_termination = "\n"
+        session.read_termination = "\n"
 
         session.write(cmd)
         session.close()
 
     except Exception as e:
-        print('[!] Exception: ' + str(e))
+        print("[!] Exception: " + str(e))
 
 
 def send_scpi_query(dev, query):
@@ -42,23 +43,23 @@ def send_scpi_query(dev, query):
         session = resourceManager.open_resource(dev)
 
         # Need to define the termination string
-        session.write_termination = '\n'
-        session.read_termination = '\n'
+        session.write_termination = "\n"
+        session.read_termination = "\n"
 
-        #print('IDN: ' + str(session.query(query)))
+        # print('IDN: ' + str(session.query(query)))
         response = str(session.query(query))
         session.close()
         return response
 
     except Exception as e:
-        print('[!] Exception: ' + str(e))
+        print("[!] Exception: " + str(e))
+
 
 # --- MAIN ---
 
 # Set the IP Address and port
-proteus_device = 'TCPIP0::192.168.0.74::5025::SOCKET'
+proteus_device = "TCPIP0::192.168.0.74::5025::SOCKET"
 
 
 # Query device ID
-print('IDN: ' + send_scpi_query(proteus_device, '*IDN?'))
-
+print("IDN: " + send_scpi_query(proteus_device, "*IDN?"))

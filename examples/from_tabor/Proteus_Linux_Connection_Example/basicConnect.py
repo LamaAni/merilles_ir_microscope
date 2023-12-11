@@ -1,16 +1,16 @@
-
 import numpy as np
-#import math
-#import csv
+
+# import math
+# import csv
 import sys
 import os
-import gc 
+import gc
 
 
-#srcpath = os.path.realpath('../')
-#sys.path.append(srcpath)
+# srcpath = os.path.realpath('../')
+# sys.path.append(srcpath)
 
-#from teproteus import TEProteusAdmin, TEProteusInst
+# from teproteus import TEProteusAdmin, TEProteusInst
 
 from tevisainst import TEVisaInst
 
@@ -24,7 +24,7 @@ def disconnect():
     global admin
     if inst is not None:
         try:
-            inst.close_instrument()            
+            inst.close_instrument()
         except:
             pass
         inst = None
@@ -35,6 +35,7 @@ def disconnect():
             pass
         admin = None
     gc.collect()
+
 
 def connect(ip_address):
     global inst
@@ -48,13 +49,10 @@ def connect(ip_address):
         pass
     else:
         return inst
-        
-        
-inst=connect("192.168.0.74")
+
+
+inst = connect("192.168.0.74")
 
 if inst is not None:
     idn_str = inst.send_scpi_query("*IDN?")
-    print('Connected to: ' + idn_str.strip())
-    
-            
-        
+    print("Connected to: " + idn_str.strip())
