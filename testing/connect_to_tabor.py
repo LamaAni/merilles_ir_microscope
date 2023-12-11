@@ -1,12 +1,20 @@
 import re
-from typing import List
+from typing import Iterable, List, Union
 from common.log import log
 import pyvisa
+import pyvisa.util
 from pyvisa.resources.tcpip import TCPIPInstrument
 
 
 class TaborSocketClientException(Exception):
     def __init__(self, *args: object, code: int = -1) -> None:
+        if code is None:
+            code = -1
+        if not isinstance(code, int):
+            try:
+                code = int(code)
+            except Exception:
+                pass
         if code > -1:
             args = list(args) + [code]
         super().__init__(*args)
@@ -19,6 +27,42 @@ class TaborSocketClientException(Exception):
         return super().__str__()
 
 
+class TaborWaveformDACMode:
+    int_8 = "int_8"
+    int_16 = "int_16"
+
+
+class TaborWaveform:
+    def __init__(
+        self, channel: int, values: List[float] = None, segment_id: int = None
+    ) -> None:
+        assert isinstance(channel, int) and channel > -1, ValueError(
+            "Invalid segment type. Must be a positive integer"
+        )
+        self.channel = channel
+        self.values: List[float] = values or []
+        self._segment_id = segment_id
+
+    @property
+    def segment_id(self) -> int:
+        return (
+            self._segment_id if self._segment_id is not None else self.channel % 2 + 1
+        )
+
+    @segment_id.setter
+    def segment_id(self, val: int):
+        self._segment_id = val
+
+    @property
+    def segment_length(self) -> int:
+        return len(self.values)
+
+    def as_binary_data(
+        self, dac_mode: TaborWaveformDACMode = TaborWaveformDACMode.int_16
+    ):
+        pass
+
+
 class TaborSocketClient:
     def __init__(
         self,
@@ -27,6 +71,7 @@ class TaborSocketClient:
         raise_errors: bool = True,
         timeout: int = 30000,
         read_bytes_chunk: int = 4096,
+        dac_mode: TaborWaveformDACMode = TaborWaveformDACMode.int_16,
     ) -> None:
         self.resource_name = f"TCPIP0::{host}::{port}::SOCKET"
         self.resource_manager = pyvisa.ResourceManager("@py")
@@ -35,6 +80,7 @@ class TaborSocketClient:
         self.raise_errors = raise_errors
         self.timeout = timeout
         self.read_bytes_chunk = read_bytes_chunk
+        self.dac_mode = dac_mode
 
     def __del__(self):
         if self.__resource is not None:
@@ -109,15 +155,23 @@ class TaborSocketClient:
     def write_binary(
         self,
         command: str,
-        data: bytes,
+        data: Union[Iterable, bytes, List[float]],
+        datatype: str = None,
     ):
         self.__assert_connected()
         query = self.__compose_query("*CLS", command)
 
         try:
+            if datatype is None:
+                # Can autodetect float only in list format
+                if isinstance(data, list) and isinstance(data[0], float):
+                    datatype = pyvisa.util.BINARY_DATATYPES["f"]
+                else:
+                    datatype = pyvisa.util.BINARY_DATATYPES["b"]
             self.resource.write_binary_values(
                 query,
                 data,
+                datatype=datatype,
             )
 
             self.resource.read()
@@ -161,12 +215,17 @@ class TaborSocketClient:
 
         return buff
 
-    def write_waveform(self, channel: int, wave: List[float]):
-        self.query("*CLS")
-        self.query(f":INST:CHAN {channel}", )
+    def write_waveform(self, *waveforms: TaborWaveform):
+        for wav in waveforms:
+            self.query(
+                "*CLS",  # Clear the current query
+                f":INST:CHAN {wav.channel}",  # Reset the query and set the channel
+                f":TRAC:DEF {wav.segment_id}, {wav.segment_length}",  # Define the segment
+                f":TRAC:SEL {wav.segment_id}",  # Select the segment
+            )
 
-        waveform_segment = channel % 2 + 1
-        pass
+            # Write the values data for the waveform
+            self.write_binary(":TRAC:DATA", wav.as_binary_data(self.dac_mode))
 
     def static_out(
         self,
@@ -185,5 +244,8 @@ client.connect()
 log.info(client.query("*IDN?", "*IDN?"))
 log.info(client.query(":INST:CHAN 1", ":OUTP?"))
 log.info(client.command(":INST:CHAN 1", ":FREQ 1e9", ":OUTP ON"))
+
+
+client.write_waveform(TaborWaveform(1, [1.0 * v / 10 for v in [0, 1, 3, 5, 1, 5]]))
 
 client.disconnect()
