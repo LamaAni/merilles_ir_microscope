@@ -1,5 +1,4 @@
 import math
-from matplotlib import pyplot as plt
 from tabor_client import TaborClient
 from tabor_client.data import TaborSignDataSegment, TaborWaveform, TaborDataSegment
 
@@ -15,7 +14,7 @@ if __name__ == "__main__":
     dc1 = TaborWaveform(
         channel=1,
         values=TaborDataSegment(
-            values=[0.2],
+            values=[0.5],
             last_value=last_value,
         ),
     )
@@ -36,6 +35,6 @@ if __name__ == "__main__":
         ),
     )
 
-    client.waveform_out(dc1, wav2)
+    client.waveform_out(wav1, wav2)
 
     client.disconnect()
