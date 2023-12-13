@@ -75,14 +75,32 @@ class TaborDataSegment(dict):
     def min_length(self, val: int):
         self["min_length"] = val
 
-    def to_segment_byte_data(self, values: List[float] = None):
-        """Returns the data values as tabor transferrable data types
+    @classmethod
+    def floor_to_segment_step_size(
+        cls, seg_len: int, step_size: TABOR_SEGMENT_STEP_SIZE
+    ):
+        return seg_len - seg_len % step_size
+
+    @classmethod
+    def ceil_to_segment_step_size(
+        cls, seg_len: int, step_size: TABOR_SEGMENT_STEP_SIZE
+    ):
+        leftover = seg_len % step_size
+        if leftover > 0:
+            seg_len += step_size - leftover
+        return seg_len
+
+    def __get_values(self):
+        return self.values
+
+    def to_segment_values(self, values: List[float] = None):
+        """Returns the data values as tabor proper segment values
 
         Returns:
-            List[byte8 | byte16] as numbers: The values converted to tabore
+            List[float] as numbers: The values converted to tabore
                 digestable range
         """
-        vals = list(values or self.values)
+        vals = list(values or self.__get_values())
         vals_len = len(vals)
         if vals_len < self.min_length:
             vals_len = self.min_length
@@ -91,15 +109,15 @@ class TaborDataSegment(dict):
             vals_len = TABOR_SEGMENT_MIN_LENGTH
 
         # Adjust to step size
-        val_len_leftover = vals_len % TABOR_SEGMENT_STEP_SIZE
-        if val_len_leftover > 0:
-            vals_len = vals_len - val_len_leftover + TABOR_SEGMENT_STEP_SIZE
+        vals_len = self.ceil_to_segment_step_size(vals_len, TABOR_SEGMENT_STEP_SIZE)
 
+        # Add the padding
         val_padding = vals_len - len(vals)
 
         if val_padding > 0:
             repeat_value = self.last_value if self.last_value is not None else vals[-1]
             vals += [repeat_value for _ in range(val_padding)]
+
         return vals
 
     def clone(self):
@@ -180,8 +198,8 @@ class TaborSignDataSegment(TaborDataSegment):
             "The values property cannot be accessed in TaborSignDataSegment"
         )
 
-    def to_segment_byte_data(self):
-        return super().to_segment_byte_data(
+    def to_segment_values(self):
+        return super().to_segment_values(
             values=self.create_sine_waveform(),
         )
 

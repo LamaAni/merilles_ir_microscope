@@ -281,7 +281,7 @@ class TaborClient:
                 seg = seg.data_segment
 
             # self.query(":INST:CHAN 1", ":OUTP?")
-            seg_data = seg.to_segment_byte_data()
+            seg_data = seg.to_segment_values()
 
             # To data values
             self.command(

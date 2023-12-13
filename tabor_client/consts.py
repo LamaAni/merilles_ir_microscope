@@ -1,6 +1,3 @@
-from enum import Enum
-
-
 class TaborWaveformDACMode:
     """The tabor waveform DAC data transfer value size in bits"""
 
