@@ -28,8 +28,4 @@ if __name__ == "__main__":
     )
     client.waveform_out(wav1, wav2)
 
-    client.voltage_out(1, 0.5)
-    client.voltage_out(2, 0.3)
-    client.off(1, 2)
-
     client.disconnect()

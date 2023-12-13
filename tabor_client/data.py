@@ -77,13 +77,13 @@ class TaborDataSegment(dict):
 
     @classmethod
     def floor_to_segment_step_size(
-        cls, seg_len: int, step_size: TABOR_SEGMENT_STEP_SIZE
+        cls, seg_len: int, step_size: int = TABOR_SEGMENT_STEP_SIZE
     ):
         return seg_len - seg_len % step_size
 
     @classmethod
     def ceil_to_segment_step_size(
-        cls, seg_len: int, step_size: TABOR_SEGMENT_STEP_SIZE
+        cls, seg_len: int, step_size: int = TABOR_SEGMENT_STEP_SIZE
     ):
         leftover = seg_len % step_size
         if leftover > 0:
@@ -109,7 +109,7 @@ class TaborDataSegment(dict):
             vals_len = TABOR_SEGMENT_MIN_LENGTH
 
         # Adjust to step size
-        vals_len = self.ceil_to_segment_step_size(vals_len, TABOR_SEGMENT_STEP_SIZE)
+        vals_len = self.ceil_to_segment_step_size(vals_len)
 
         # Add the padding
         val_padding = vals_len - len(vals)
@@ -132,12 +132,13 @@ class TaborSignDataSegment(TaborDataSegment):
         phase: float = 0,
         repeate: int = 0,
         segment_id: int = -1,
+        smooth_edges: bool = True,
+        generator_freq: float = TaborWaveformDACModeFreq.uint_16,
         last_value: float = None,
         min_value: float = 0,
         max_value: float = 1,
         min_length: int = TABOR_SEGMENT_MIN_LENGTH,
         from_data_segment: TaborDataSegment = None,
-        base_freq: float = TaborWaveformDACModeFreq.uint_16,
     ):
         super().__init__(
             segment_id=segment_id,
@@ -152,15 +153,24 @@ class TaborSignDataSegment(TaborDataSegment):
         self.freq = freq
         self.repeat = repeate
         self.phase = phase
-        self.base_freq = base_freq
+        self.generator_freq = generator_freq
+        self.smooth_edges = smooth_edges
 
     @property
-    def base_freq(self) -> float:
-        return self.get("base_freq", TaborWaveformDACModeFreq.uint_16)
+    def smooth_edges(self) -> bool:
+        return self.get("smooth_edges", True)
 
-    @base_freq.setter
-    def base_freq(self, val: float):
-        self["base_freq"] = val
+    @smooth_edges.setter
+    def smooth_edges(self, val: bool):
+        self["smooth_edges"] = val
+
+    @property
+    def generator_freq(self) -> float:
+        return self.get("generator_freq", TaborWaveformDACModeFreq.uint_16)
+
+    @generator_freq.setter
+    def generator_freq(self, val: float):
+        self["generator_freq"] = val
 
     @property
     def freq(self) -> float:
@@ -203,11 +213,16 @@ class TaborSignDataSegment(TaborDataSegment):
             values=self.create_sine_waveform(),
         )
 
+    def __get_values(self):
+        return self.create_sine_waveform()
+
     def create_sine_waveform(
         self,
     ):
         repeate = self.repeat
-        signle_wave_steps = int(math.floor(self.base_freq / self.freq))
+        signle_wave_steps = int(math.floor(self.generator_freq / self.freq))
+        if self.smooth_edges:
+            signle_wave_steps = self.ceil_to_segment_step_size(signle_wave_steps)
 
         if repeate <= 0:
             min_steps = (
@@ -263,5 +278,3 @@ class TaborWaveform(dict):
     @data_segment.setter
     def data_segment(self, val: TaborDataSegment):
         self["data_segment"] = val
-
-    pass
