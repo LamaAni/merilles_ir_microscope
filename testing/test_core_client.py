@@ -1,4 +1,5 @@
 import math
+from matplotlib import pyplot as plt
 from tabor_client import TaborClient
 from tabor_client.data import TaborSignDataSegment, TaborWaveform, TaborDataSegment
 
@@ -34,6 +35,9 @@ if __name__ == "__main__":
             phase=math.pi * 1,
         ),
     )
+
+    plt.figure(1)
+    plt.plot(*wav1.to_plot_data())
     client.waveform_out(dc1, wav2)
 
     client.disconnect()

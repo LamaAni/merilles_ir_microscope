@@ -120,6 +120,11 @@ class TaborDataSegment(dict):
 
         return vals
 
+    def to_plot_data(self, values: List[float] = None, freq: float = 1):
+        y_vals = self.to_segment_values(values=values)
+        x_vals = [i * 1.0 / freq for i in range(len(y_vals))]
+        return x_vals, y_vals
+
     def clone(self):
         """Creates a clone of the current data segment"""
         return TaborDataSegment(segment_id=self.segment_id, from_data_segment=self)
@@ -208,11 +213,6 @@ class TaborSignDataSegment(TaborDataSegment):
             "The values property cannot be accessed in TaborSignDataSegment"
         )
 
-    def to_segment_values(self):
-        return super().to_segment_values(
-            values=self.create_sine_waveform(),
-        )
-
     def __get_values(self):
         return self.create_sine_waveform()
 
@@ -278,3 +278,7 @@ class TaborWaveform(dict):
     @data_segment.setter
     def data_segment(self, val: TaborDataSegment):
         self["data_segment"] = val
+
+    def to_plot_data(self, values: List[float] = None, freq: float = None):
+        freq = freq if freq is not None else TaborWaveformDACModeFreq.uint_16
+        return self.data_segment.to_plot_data(values=values, freq=freq)
