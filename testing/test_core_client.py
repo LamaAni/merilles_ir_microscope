@@ -36,8 +36,6 @@ if __name__ == "__main__":
         ),
     )
 
-    plt.figure(1)
-    plt.plot(*wav1.to_plot_data())
     client.waveform_out(dc1, wav2)
 
     client.disconnect()

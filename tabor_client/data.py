@@ -90,7 +90,7 @@ class TaborDataSegment(dict):
             seg_len += step_size - leftover
         return seg_len
 
-    def __get_values(self):
+    def get_values(self):
         return self.values
 
     def to_segment_values(self, values: List[float] = None):
@@ -100,7 +100,7 @@ class TaborDataSegment(dict):
             List[float] as numbers: The values converted to tabore
                 digestable range
         """
-        vals = list(values or self.__get_values())
+        vals = list(values or self.get_values())
         vals_len = len(vals)
         if vals_len < self.min_length:
             vals_len = self.min_length
@@ -120,7 +120,11 @@ class TaborDataSegment(dict):
 
         return vals
 
-    def to_plot_data(self, values: List[float] = None, freq: float = 1):
+    def to_plot_data(
+        self,
+        values: List[float] = None,
+        freq: float = TaborWaveformDACModeFreq.uint_16,
+    ):
         y_vals = self.to_segment_values(values=values)
         x_vals = [i * 1.0 / freq for i in range(len(y_vals))]
         return x_vals, y_vals
@@ -213,7 +217,7 @@ class TaborSignDataSegment(TaborDataSegment):
             "The values property cannot be accessed in TaborSignDataSegment"
         )
 
-    def __get_values(self):
+    def get_values(self):
         return self.create_sine_waveform()
 
     def create_sine_waveform(
@@ -279,6 +283,9 @@ class TaborWaveform(dict):
     def data_segment(self, val: TaborDataSegment):
         self["data_segment"] = val
 
-    def to_plot_data(self, values: List[float] = None, freq: float = None):
-        freq = freq if freq is not None else TaborWaveformDACModeFreq.uint_16
+    def to_plot_data(
+        self,
+        values: List[float] = None,
+        freq: float = TaborWaveformDACModeFreq.uint_16,
+    ):
         return self.data_segment.to_plot_data(values=values, freq=freq)
