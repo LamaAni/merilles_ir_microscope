@@ -1,94 +1,20 @@
-from ast import Tuple
-from datetime import datetime
 import math
 import re
-import time
-from typing import Iterable, List, Union
-from common.log import log
 import pyvisa
 import pyvisa.util
+
+from ast import Tuple
+from datetime import datetime
+from typing import Iterable, List, Union
 from pyvisa.resources.tcpip import TCPIPInstrument
 
-
-class TaborSocketClientException(Exception):
-    def __init__(self, *args: object, code: int = -1) -> None:
-        if code is None:
-            code = -1
-        if not isinstance(code, int):
-            try:
-                code = int(code)
-            except Exception:
-                pass
-        if code > -1:
-            args = list(args) + [code]
-        super().__init__(*args)
-        self.code = code
-
-    def __str__(self) -> str:
-        val = super().__str__()
-        if self.code > 0:
-            val = f"{val} (code: {self.code})"
-        return super().__str__()
+from tabor_client.exceptions import TaborClientException, TaborClientSocketException
+from tabor_client.consts import TaborWaveformDACMode, TaborWaveformDACModeFreq
+from tabor_client.data import TaborWaveform, TaborDataSegment
+from tabor_client.log import log
 
 
-class TaborWaveformDACMode:
-    int_8 = 8
-    int_16 = 16
-
-
-class TaborWaveform(dict):
-    TABOR_SEGMENT_MIN_LENGTH = 1024
-    TABOR_SEGMENT_STEP_SIZE = 32
-
-    def __init__(
-        self,
-        channel: int,
-        values: List[float] = None,
-        segment_id: int = None,
-        repeat_last_value_in_padding: bool = True,
-        min_value: float = 0,
-        max_value: float = 1,
-    ) -> None:
-        assert isinstance(channel, int) and channel > -1, ValueError(
-            "Invalid segment type. Must be a positive integer"
-        )
-        super()
-        self.channel = channel
-        self.values: List[float] = values or []
-        self.repeat_last_value_in_padding = repeat_last_value_in_padding
-        self.min_value = min_value
-        self.max_value = max_value
-
-        self.__segment_id = segment_id
-
-    @property
-    def segment_id(self) -> int:
-        return (
-            self.__segment_id if self.__segment_id is not None else self.channel % 2 + 1
-        )
-
-    @segment_id.setter
-    def segment_id(self, val: int):
-        self.__segment_id = val
-
-    def to_segment_data(self):
-        # returns the iterator for binary data conversion
-        # curretnly very simple convert to array.
-        vals = list(self.values)
-        padding_length = 0
-        if len(vals) < self.TABOR_SEGMENT_MIN_LENGTH:
-            padding_length = self.TABOR_SEGMENT_MIN_LENGTH - len(vals)
-        else:
-            padding_length = self.TABOR_SEGMENT_STEP_SIZE - (
-                len(vals) % self.TABOR_SEGMENT_STEP_SIZE
-            )
-        if padding_length > 0:
-            repeat_value = vals[-1] if self.repeat_last_value_in_padding else 0
-            vals += [repeat_value for _ in range(padding_length)]
-        return vals
-
-
-class TaborSocketClient:
+class TaborClient:
     def __init__(
         self,
         host: str,
@@ -165,12 +91,12 @@ class TaborSocketClient:
         )
 
         if "P9082" in self.model:
-            self.dac_mode = TaborWaveformDACMode.int_8
-            self._freq = 9e9
+            self.dac_mode = TaborWaveformDACMode.uint_8
+            self._freq = TaborWaveformDACModeFreq.uint_8
             self._max_dac_value = 2**8 - 1
         else:
-            self.dac_mode = TaborWaveformDACMode.int_16
-            self._freq = 2.5e9
+            self.dac_mode = TaborWaveformDACMode.uint_16
+            self._freq = TaborWaveformDACModeFreq.uint_16
             self._max_dac_value = 2**16 - 1
 
         # Setting interaction frequency
@@ -184,21 +110,34 @@ class TaborSocketClient:
         self.__resource = None
 
     def __assert_connected(self):
-        assert self.resource is not None, TaborSocketClientException(
+        assert self.resource is not None, TaborClientException(
             "Not connected, please run .connect()"
         )
 
+    def __clean_queries(self, queries: Iterable[str]):
+        return [q.strip() for q in queries if q is not None and len(q.strip()) > 0]
+
     def __compose_query(self, *queries: str):
-        queries = [q.strip() for q in queries]
-        return self.seperator.join(queries)
+        return self.seperator.join(self.__clean_queries(queries))
 
     def __parse_error_response(self, rsp):
         [error_code, error_string] = re.split(r",\s*", rsp)
-        return TaborSocketClientException(error_string, code=error_code)
+        return TaborClientSocketException(error_string, code=error_code)
 
-    def query(self, *queries: str, force_list: bool = False):
+    def query(
+        self,
+        *queries: str,
+        force_list: bool = False,
+        sync: bool = False,
+    ):
         self.__assert_connected()
+        queries = self.__clean_queries(queries)
+
         assert len(queries) > 0, ValueError("At least one query must be sent")
+        queries: List[str] = list(queries)
+        if sync:
+            queries.insert(0, "*OPC?")
+            queries.append("*OPC?")
         query = self.__compose_query(*queries)
         log.debug("Sending query: " + query)
         self.__append_to_command_record(query)
@@ -207,30 +146,29 @@ class TaborSocketClient:
             return rsp[0]
         return rsp
 
-    def clear_error_list(self):
-        self.command("*CLS", assert_command_string=False)
-
     def command(
         self,
         *queries: str,
         force_list: bool = False,
         raise_errors: bool = None,
-        synchronize: bool = False,
+        sync: bool = False,
         assert_command_string: bool = True,
     ):
-        if synchronize:
+        if sync:
             self.query("*OPC?")
 
         self.__assert_connected()
+        queries = self.__clean_queries(queries)
+
         assert len(queries) > 0, ValueError("At least one query must be sent")
-        assert not assert_command_string or all(
-            [q.strip().startswith(":") for q in queries]
-        ), ValueError("Command queries myst start with ':'")
+        # assert not assert_command_string or all(
+        #     [q.strip() == "*OPC?" or q.strip().startswith(":") for q in queries]
+        # ), ValueError("Command queries myst start with ':'")
 
         raise_errors = self.raise_errors if raise_errors is None else raise_errors
 
         compose = list(queries)
-        if synchronize:
+        if sync:
             compose.insert(0, "*OPC?")
             compose.append("*OPC?")
         compose.append(":SYST:ERR?")
@@ -243,7 +181,7 @@ class TaborSocketClient:
         rsp = rsp[:-1]
 
         if err.code != 0:
-            raise err from TaborSocketClientException("Error sending command")
+            raise err from TaborClientException("Error sending command")
         if len(rsp) == 0:
             return None
         if force_list and len(queries) < 2:
@@ -267,11 +205,11 @@ class TaborSocketClient:
 
             self.resource.read()
         except Exception as ex:
-            raise ex from TaborSocketClientException("Error while writing binary data")
+            raise ex from TaborClientException("Error while writing binary data")
 
         err = self.__parse_error_response(self.resource.query(":SYST:ERR?"))
         if err.code != 0:
-            raise err from TaborSocketClientException("Error writing binary data")
+            raise err from TaborClientException("Error writing binary data")
 
     def read_binary(
         self,
@@ -284,13 +222,13 @@ class TaborSocketClient:
 
         # reading the byte response header
         buff = self.resource.read_bytes(1)
-        assert buff == b"#", TaborSocketClientException(
+        assert buff == b"#", TaborClientException(
             f"Expected bytes read header to be #, but found {buff}"
         )
 
         # reading the number of bytes
         buff = self.resource.read_bytes(1)
-        assert b"0" <= buff <= b"9", TaborSocketClientException(
+        assert b"0" <= buff <= b"9", TaborClientException(
             f"Expected bytes digits to be an number, but found {buff}"
         )
         num_bytes_digits = int(buff.decode("utf-8"))
@@ -327,94 +265,121 @@ class TaborSocketClient:
 
         return [conert_data_value(v) for v in vals]
 
-    def write_waveform(self, *waveforms: TaborWaveform):
-        for wav in waveforms:
+    def write_segments(self, *segments: Union[TaborDataSegment, TaborWaveform]):
+        assert all(
+            isinstance(
+                (seg.data_segment if isinstance(seg, TaborWaveform) else seg),
+                TaborDataSegment,
+            )
+            for seg in segments
+        ), ValueError(
+            "All segments or waveform.data_segment must be of instance TaborDataSegment"
+        )
+
+        for seg in segments:
+            if isinstance(seg, TaborWaveform):
+                seg = seg.data_segment
+
             # self.query(":INST:CHAN 1", ":OUTP?")
-            wav_data = wav.to_segment_data()
+            seg_data = seg.to_segment_byte_data()
 
             # To data values
             self.command(
-                f":TRAC:DEL {wav.segment_id}",
-                f":TRAC:DEF {wav.segment_id}, {len(wav_data)}",  # Define the segment
-                f":TRAC:SEL {wav.segment_id}",  # Select the segment
+                f":TRAC:DEL {seg.segment_id}",
+                f":TRAC:DEF {seg.segment_id}, {len(seg_data)}",  # Define the segment
+                f":TRAC:SEL {seg.segment_id}",  # Select the segment
                 f":TRAC:FORM U{self.dac_mode}",  # Set the data format
             )
 
             # Write the values data for the waveform
             wav_binary_data = self.__waveform_values_to_data_values(
-                wav_data,
-                wav.max_value,
-                wav.min_value,
+                seg_data,
+                seg.max_value,
+                seg.min_value,
+            )
+            log.debug(
+                f"WRITING SEGMENT {seg.segment_id} of length {len(wav_binary_data)} (x{self.dac_mode} bits)"
             )
             self.write_binary(
                 ":TRAC:DATA",
                 wav_binary_data,
-                datatype="H" if self.dac_mode == TaborWaveformDACMode.int_16 else "b",
+                datatype="H" if self.dac_mode == TaborWaveformDACMode.uint_16 else "b",
             )
 
-    def trigger_waveform(self, *waveforms: TaborWaveform, synchronize: bool = True):
-        queries = []
+    # region Simple methods
+    # -------------------
 
-        for wav in waveforms:
-            queries.append(f":INST:CHAN {wav.channel}")
-            queries.append(":OUTP OFF")
-            # queries.append(f":FUNC:MODE ARB {wav.segment_id}")
-            queries.append(f":FUNC:MODE:SEGM {wav.segment_id}")
-            queries.append(":OUTP ON")
+    def clear_error_list(self):
+        self.command("*CLS", assert_command_string=False)
 
-        self.command(*queries, synchronize=synchronize)
+    # endregion
 
-    def waveform_out(self, *waveforms: TaborWaveform, synchronize: bool = True):
-        # self.stop_channel(*waveforms)
-        self.write_waveform(*waveforms)
-        self.trigger_waveform(*waveforms, synchronize=synchronize)
+    # region Simple command methods
+    # -------------------
 
-    def stop_channel(self, *channel: Union[int, TaborWaveform]):
-        queries = []
-        for c in channel:
-            if isinstance(c, TaborWaveform):
-                c = c.channel
-            queries.append(f":INST:CHAN {c}")
-            queries.append(":OUTP OFF")
+    def waveform_out(
+        self,
+        *wavs: TaborWaveform,
+        turn_output_off_before_starting: bool = True,
+    ):
+        for wav in wavs:
+            self.write_segments(wav)
 
-        self.command(*queries)
+        for wav in wavs:
+            self.command(
+                f":INST:CHAN:SEL {wav.channel}",
+                ":OUTP OFF" if turn_output_off_before_starting else None,
+                ":MODE DIR",
+                ":FUNC:MODE ARB",
+                f":FUNC:MODE:SEGM {wav.data_segment.segment_id}",
+                ":OUTP ON",
+            )
         self.query("*OPC?")
 
-    def static_out(
+    def voltage_out(
         self,
-        channel: int = 1,
-        value: float = 1,
+        channel: int,
+        value: float,
+        turn_output_off_before_starting: bool = True,
     ):
-        return self.waveform_out(TaborWaveform(channel=channel, values=[value]))
+        wav = TaborWaveform(channel=channel, values=[value])
+
+        self.waveform_out(
+            wav,
+            turn_output_off_before_starting=turn_output_off_before_starting,
+        )
+
+    def off(
+        self,
+        *channel,
+    ):
+        self.command(
+            *[self.__compose_query(f":INST:CHAN:SEL {c}", ":OUTP OFF") for c in channel]
+        )
+
+    def on(
+        self,
+        *channel,
+    ):
+        self.command(
+            *[self.__compose_query(f":INST:CHAN:SEL {c}", ":OUTP OFF") for c in channel]
+        )
+
+    # endregion
 
 
 if __name__ == "__main__":
+    from time import sleep
+
     host = "134.74.27.64"
     port = "5025"
-    client = TaborSocketClient(host, port, keep_command_and_query_record=True)
+    client = TaborClient(host, port, keep_command_and_query_record=True)
     client.connect()
 
-    # log.info(client.query(":INST:CHAN 1", ":OUTP?"))
-    # log.info(client.command(":INST:CHAN 1", ":FREQ 1e9", ":OUTP ON"))
-
-    def preper_sin_waveform(freq=1e7):
-        steps = int(math.floor(client.freq / freq))
-        return [0.5 + 0.5 * math.sin(2.0 * math.pi * i / steps) for i in range(steps)]
-
-    wav = TaborWaveform(1, preper_sin_waveform())
-    log.info("STARTING")
-
-    # client.static_out(wav.channel, 0)
-    # time.sleep(5)
-    client.waveform_out(wav)
-    # time.sleep(10)
-    # client.stop_channel(wav)-
-    # client.static_out(wav.channel, 1)
-    # time.sleep(5)
-
-    log.info("DONE")
+    log.info("Setting channel 1")
+    client.voltage_out(1, 0.5)
+    sleep(1)
+    log.info("Setting channel 2")
+    client.voltage_out(2, 0.3)
 
     client.disconnect()
-
-    print()
-    print("\n".join(client.print_command_record()))

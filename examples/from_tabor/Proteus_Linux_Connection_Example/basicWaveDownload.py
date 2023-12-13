@@ -70,10 +70,13 @@ def setFreq(FREQ):
     print("DAC Generate Freq:{0}".format(freq))
 
 
-def prepareWaveData(num_channels):
+def prepareWaveData(num_channels, cycles: int = None):
     global max_dac
     seglen = 2**12  # 2 ** 20 # 1MB
-    num_cycles = [2**n for n in range(num_channels)]
+    if cycles is None or cycles <= 0:
+        num_cycles = [2**n for n in range(num_channels)]
+    else:
+        num_cycles = [cycles for _ in range(num_channels)]
 
     waves = [None for _ in range(num_channels)]
 
@@ -143,7 +146,10 @@ def downloadWaves(waves, num_channels):
         inst.send_scpi_cmd(cmd, paranoia_level)
 
 
-inst = connect("192.168.0.74")
+host = "134.74.27.64"
+port = "5025"
+
+inst = connect(host)
 
 if inst is not None:
     idn_str = inst.send_scpi_query("*IDN?")
@@ -165,6 +171,5 @@ if inst is not None:
     print("DAC waveform format: {0} bits-per-point".format(dac_mode))
 
     setFreq(FREQ)
-
-    waves = prepareWaveData(num_channels=4)
+    waves = prepareWaveData(num_channels=4, cycles=20)
     downloadWaves(waves, num_channels=4)
