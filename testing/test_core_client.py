@@ -1,6 +1,6 @@
 import math
 from tabor_client import TaborClient
-from tabor_client.data import TaborSignDataSegment, TaborWaveform
+from tabor_client.data import TaborSignDataSegment, TaborWaveform, TaborDataSegment
 
 if __name__ == "__main__":
     host = "134.74.27.64"
@@ -10,6 +10,14 @@ if __name__ == "__main__":
 
     freq = 1e7
     last_value = None
+
+    dc1 = TaborWaveform(
+        channel=1,
+        values=TaborDataSegment(
+            values=[0.2],
+            last_value=last_value,
+        ),
+    )
 
     wav1 = TaborWaveform(
         channel=1,
@@ -26,6 +34,6 @@ if __name__ == "__main__":
             phase=math.pi * 1,
         ),
     )
-    client.waveform_out(wav1, wav2)
+    client.waveform_out(dc1, wav2)
 
     client.disconnect()
