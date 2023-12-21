@@ -140,6 +140,7 @@ class TaborSignDataSegment(TaborDataSegment):
         freq: float,
         phase: float = 0,
         repeate: int = 0,
+        amplitude: float = 1,
         segment_id: int = -1,
         smooth_edges: bool = True,
         generator_freq: float = TaborWaveformDACModeFreq.uint_16,
@@ -164,6 +165,15 @@ class TaborSignDataSegment(TaborDataSegment):
         self.phase = phase
         self.generator_freq = generator_freq
         self.smooth_edges = smooth_edges
+        self.amplitude = amplitude
+
+    @property
+    def amplitude(self) -> float:
+        return self.get("amplitude", 1)
+
+    @amplitude.setter
+    def amplitude(self, val: float):
+        self["amplitude"] = val
 
     @property
     def smooth_edges(self) -> bool:
@@ -241,7 +251,9 @@ class TaborSignDataSegment(TaborDataSegment):
         range_steps = signle_wave_steps * repeate
 
         return [
-            0.5 + 0.5 * math.sin(2.0 * math.pi * i / signle_wave_steps + self.phase)
+            self.amplitude
+            / 2
+            * (1 + math.sin(2.0 * math.pi * i / signle_wave_steps + self.phase))
             for i in range(range_steps)
         ]
 
@@ -253,6 +265,8 @@ class TaborWaveform(dict):
         self,
         channel: int,
         values: Union[TaborDataSegment, List[float]] = None,
+        offset: float = 0,
+        amplitude: float = 0.5,
     ) -> None:
         assert isinstance(channel, int) and channel > -1, ValueError(
             "Invalid segment type. Must be a positive integer"
@@ -282,6 +296,22 @@ class TaborWaveform(dict):
     @data_segment.setter
     def data_segment(self, val: TaborDataSegment):
         self["data_segment"] = val
+
+    @property
+    def offset(self) -> float:
+        return self.get("offset", 0)
+
+    @offset.setter
+    def offset(self, val: float):
+        self["offset"] = val
+
+    @property
+    def amplitude(self) -> float:
+        return self.get("amplitude", 0.5)
+
+    @amplitude.setter
+    def amplitude(self, val: float):
+        self["amplitude"] = val
 
     def to_plot_data(
         self,
