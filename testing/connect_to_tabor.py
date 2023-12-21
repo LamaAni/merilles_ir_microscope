@@ -208,7 +208,7 @@ class TaborSocketClient:
         return rsp
 
     def clear_error_list(self):
-        self.command("*CLS", assert_command_string=False)
+        self.command("*CLS")
 
     def command(
         self,
@@ -216,16 +216,12 @@ class TaborSocketClient:
         force_list: bool = False,
         raise_errors: bool = None,
         synchronize: bool = False,
-        assert_command_string: bool = True,
     ):
         if synchronize:
             self.query("*OPC?")
 
         self.__assert_connected()
         assert len(queries) > 0, ValueError("At least one query must be sent")
-        assert not assert_command_string or all(
-            [q.strip().startswith(":") for q in queries]
-        ), ValueError("Command queries myst start with ':'")
 
         raise_errors = self.raise_errors if raise_errors is None else raise_errors
 

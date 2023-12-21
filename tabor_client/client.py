@@ -1,4 +1,3 @@
-import math
 import re
 import pyvisa
 import pyvisa.util
@@ -7,9 +6,13 @@ from ast import Tuple
 from datetime import datetime
 from typing import Iterable, List, Union
 from pyvisa.resources.tcpip import TCPIPInstrument
+from tabor_client.config import (
+    TaborDefaultDeviceConfig,
+    TaborDeviceConfig,
+    TaborP9082DeviceConfig,
+)
 
 from tabor_client.exceptions import TaborClientException, TaborClientSocketException
-from tabor_client.consts import TaborWaveformDACMode, TaborWaveformDACModeFreq
 from tabor_client.data import TaborWaveform, TaborDataSegment
 from tabor_client.log import log
 
@@ -22,8 +25,8 @@ class TaborClient:
         raise_errors: bool = True,
         timeout: int = 30000,
         read_bytes_chunk: int = 4096,
-        dac_mode: TaborWaveformDACMode = None,
         keep_command_and_query_record: bool = False,
+        device_config: TaborDeviceConfig = None,
     ) -> None:
         self.resource_name = f"TCPIP0::{host}::{port}::SOCKET"
         self.resource_manager = pyvisa.ResourceManager("@py")
@@ -32,37 +35,26 @@ class TaborClient:
         self.raise_errors = raise_errors
         self.timeout = timeout
         self.read_bytes_chunk = read_bytes_chunk
-        self.dac_mode = dac_mode
-
-        self._model = None
-        self._freq = None
-        self._max_dac_value = None
         self.keep_command_and_query_record = keep_command_and_query_record
+
         self.__command_record: List[Tuple] = []
+        self.__device_config = device_config
 
     def __del__(self):
         if self.__resource is not None:
             self.disconnect()
 
     @property
+    def device_config(self):
+        return self.__device_config
+
+    @property
     def resource(self) -> TCPIPInstrument:
         return self.__resource
 
     @property
-    def model(self) -> str:
-        return self._model
-
-    @property
-    def freq(self) -> float:
-        return self._freq
-
-    @property
     def command_record(self) -> List[Tuple]:
         return self.__command_record
-
-    @property
-    def dac_max_value(self) -> int:
-        return self._max_dac_value
 
     def __append_to_command_record(self, cmd_sent: str):
         if not self.keep_command_and_query_record:
@@ -84,23 +76,21 @@ class TaborClient:
 
         self.clear_error_list()
 
-        self._model = self.query(":SYST:iNF:MODel?")
+        model = self.query(":SYST:iNF:MODel?")
 
         log.debug(
-            f"Connectd to Tabor model {self.model} @ {self.resource_name}, IDN: {self.query('*IDN?')}"
+            f"Connectd to Tabor model {model} @ {self.resource_name}, IDN: {self.query('*IDN?')}"
         )
 
-        if "P9082" in self.model:
-            self.dac_mode = TaborWaveformDACMode.uint_8
-            self._freq = TaborWaveformDACModeFreq.uint_8
-            self._max_dac_value = 2**8 - 1
-        else:
-            self.dac_mode = TaborWaveformDACMode.uint_16
-            self._freq = TaborWaveformDACModeFreq.uint_16
-            self._max_dac_value = 2**16 - 1
+        if self.device_config is None:
+            if "P9082" in model:
+                self.__device_config = TaborP9082DeviceConfig()
+            else:
+                self.__device_config = TaborDefaultDeviceConfig()
+            self.__device_config.model = model
 
         # Setting interaction frequency
-        self.command(f":FREQ:RAST {self.freq}")
+        self.command(f":FREQ:RAST {self.device_config.freq}")
         log.debug(
             f"Interaction frequency set, and retrived as: {self.query(':FREQ:RAST?')}"
         )
@@ -152,7 +142,6 @@ class TaborClient:
         force_list: bool = False,
         raise_errors: bool = None,
         sync: bool = False,
-        assert_command_string: bool = True,
     ):
         if sync:
             self.query("*OPC?")
@@ -161,9 +150,6 @@ class TaborClient:
         queries = self.__clean_queries(queries)
 
         assert len(queries) > 0, ValueError("At least one query must be sent")
-        # assert not assert_command_string or all(
-        #     [q.strip() == "*OPC?" or q.strip().startswith(":") for q in queries]
-        # ), ValueError("Command queries myst start with ':'")
 
         raise_errors = self.raise_errors if raise_errors is None else raise_errors
 
@@ -244,27 +230,6 @@ class TaborClient:
 
         return buff
 
-    def __waveform_values_to_data_values(self, vals: List[float], max_value, min_value):
-        # normalizing and shifting data values
-        assert max_value >= min_value, ValueError(
-            "max_value must be larger or equal to min_value"
-        )
-        value_range = max_value - min_value
-
-        def conert_data_value(val: Union[int, float]):
-            if val < min_value:
-                val = min_value
-            elif val > max_value:
-                val = max_value
-
-            val = math.floor(
-                (1.0 * (val - min_value) / value_range) * self.dac_max_value
-            )
-
-            return val
-
-        return [conert_data_value(v) for v in vals]
-
     def write_segments(self, *segments: Union[TaborDataSegment, TaborWaveform]):
         assert all(
             isinstance(
@@ -281,36 +246,35 @@ class TaborClient:
                 seg = seg.data_segment
 
             # self.query(":INST:CHAN 1", ":OUTP?")
-            seg_data = seg.to_segment_values()
+            seg_dac_data = seg.to_dac_values(
+                device_config=self.device_config,
+            )
 
             # To data values
             self.command(
                 f":TRAC:DEL {seg.segment_id}",
-                f":TRAC:DEF {seg.segment_id}, {len(seg_data)}",  # Define the segment
+                f":TRAC:DEF {seg.segment_id}, {len(seg_dac_data)}",  # Define the segment
                 f":TRAC:SEL {seg.segment_id}",  # Select the segment
-                f":TRAC:FORM U{self.dac_mode}",  # Set the data format
+                f":TRAC:FORM U{self.device_config.data_bits}",  # Set the data format
             )
 
-            # Write the values data for the waveform
-            wav_binary_data = self.__waveform_values_to_data_values(
-                seg_data,
-                seg.max_value,
-                seg.min_value,
-            )
             log.debug(
-                f"WRITING SEGMENT {seg.segment_id} of length {len(wav_binary_data)} (x{self.dac_mode} bits)"
+                (
+                    f"WRITING SEGMENT {seg.segment_id} of length {len(seg_dac_data)}"
+                    " (x{self.device_config.data_bits} bits)"
+                )
             )
             self.write_binary(
                 ":TRAC:DATA",
-                wav_binary_data,
-                datatype="H" if self.dac_mode == TaborWaveformDACMode.uint_16 else "b",
+                seg_dac_data,
+                datatype=self.device_config.binary_data_type,
             )
 
     # region Simple methods
     # -------------------
 
     def clear_error_list(self):
-        self.command("*CLS", assert_command_string=False)
+        self.command("*CLS")
 
     # endregion
 
@@ -330,14 +294,15 @@ class TaborClient:
                 f":INST:CHAN:SEL {wav.channel}",
                 ":OUTP OFF" if turn_output_off_before_starting else None,
                 ":MODE DIR",
-                ":INT NONE",
+                # ":INT NONE",
                 f":VOLT:AMPL {wav.amplitude}",
                 f":VOLT:OFFS {wav.offset}",
                 ":FUNC:MODE ARB",
                 f":FUNC:MODE:SEGM {wav.data_segment.segment_id}",
+                "*OPC?",
                 ":OUTP ON",
             )
-        self.query("*OPC?")
+        # self.query("*OPC?")
 
     def voltage_out(
         self,
@@ -352,6 +317,13 @@ class TaborClient:
             turn_output_off_before_starting=turn_output_off_before_starting,
         )
 
+    def reset(self):
+        self.command(
+            "*CLS",
+            "*RST",
+            "*OPC?",
+        )
+
     def off(
         self,
         *channel,
@@ -360,12 +332,18 @@ class TaborClient:
             *[self.__compose_query(f":INST:CHAN:SEL {c}", ":OUTP OFF") for c in channel]
         )
 
+    def select_channel(
+        self,
+        channel,
+    ):
+        self.command(f":INST:CHAN:SEL {channel}")
+
     def on(
         self,
         *channel,
     ):
         self.command(
-            *[self.__compose_query(f":INST:CHAN:SEL {c}", ":OUTP OFF") for c in channel]
+            *[self.__compose_query(f":INST:CHAN:SEL {c}", ":OUTP ON") for c in channel]
         )
 
     # endregion

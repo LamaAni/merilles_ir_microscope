@@ -1,6 +1,11 @@
 import math
 from tabor_client import TaborClient
-from tabor_client.data import TaborSignDataSegment, TaborWaveform, TaborDataSegment
+from tabor_client.data import (
+    TaborFunctionGeneratorSegment,
+    TaborFunctionGeneratorSegmentFType,
+    TaborWaveform,
+    TaborDataSegment,
+)
 
 if __name__ == "__main__":
     host = "134.74.27.64"
@@ -22,28 +27,28 @@ if __name__ == "__main__":
         values=segment,
     )
 
-    dc2 = TaborWaveform(
-        channel=2, values=[v for v in [0.5] for _ in range(1024)]
-    )
+    dc2 = TaborWaveform(channel=2, values=[v for v in [0.5] for _ in range(1024)])
 
     wav1 = TaborWaveform(
         channel=1,
-        values=TaborSignDataSegment(
+        values=TaborFunctionGeneratorSegment(
             freq=freq,
             last_value=last_value,
-            amplitude=0.2,
+            amplitude=1,
+            function=TaborFunctionGeneratorSegmentFType.square,
         ),
     )
     wav2 = TaborWaveform(
         channel=2,
-        values=TaborSignDataSegment(
+        values=TaborFunctionGeneratorSegment(
             freq=freq,
             last_value=last_value,
             phase=math.pi * 1,
-            amplitude=0.2,
+            amplitude=1,
+            function=TaborFunctionGeneratorSegmentFType.square,
         ),
     )
 
-    client.waveform_out(dc1, dc2)
+    client.waveform_out(dc1, wav2)
 
     client.disconnect()

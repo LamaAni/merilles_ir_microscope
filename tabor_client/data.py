@@ -1,10 +1,11 @@
+from enum import Enum
 import math
 from typing import List, Union
-from tabor_client.consts import (
-    TABOR_SEGMENT_MIN_LENGTH,
-    TABOR_SEGMENT_STEP_SIZE,
-    TaborWaveformDACModeFreq,
+from tabor_client.config import (
+    TABOR_DEFAULT_DEVICE_CONFIG,
+    TaborDeviceConfig,
 )
+from tabor_client.consts import TABOR_SEGMENT_MIN_LENGTH, TABOR_SEGMENT_MIN_SIZE_STEP
 
 
 class TaborDataSegment(dict):
@@ -77,13 +78,13 @@ class TaborDataSegment(dict):
 
     @classmethod
     def floor_to_segment_step_size(
-        cls, seg_len: int, step_size: int = TABOR_SEGMENT_STEP_SIZE
+        cls, seg_len: int, step_size: int = TABOR_SEGMENT_MIN_SIZE_STEP
     ):
         return seg_len - seg_len % step_size
 
     @classmethod
     def ceil_to_segment_step_size(
-        cls, seg_len: int, step_size: int = TABOR_SEGMENT_STEP_SIZE
+        cls, seg_len: int, step_size: int = TABOR_SEGMENT_MIN_SIZE_STEP
     ):
         leftover = seg_len % step_size
         if leftover > 0:
@@ -120,13 +121,49 @@ class TaborDataSegment(dict):
 
         return vals
 
+    def to_dac_values(
+        self,
+        device_config: TaborDeviceConfig = None,
+        values: List[float] = None,
+        max_value: float = None,
+        min_value: float = None,
+    ):
+        device_config = device_config or TABOR_DEFAULT_DEVICE_CONFIG
+        max_value = self.max_value if max_value is None else max_value
+        min_value = self.min_value if min_value is None else min_value
+        values = self.to_segment_values(values)
+
+        assert max_value >= min_value, ValueError(
+            "max_value must be larger or equal to min_value"
+        )
+        value_range = max_value - min_value
+        dac_range = device_config.dac_range
+
+        def conert_data_value(val: Union[int, float]):
+            if val < min_value:
+                val = min_value
+            elif val > max_value:
+                val = max_value
+
+            val = math.floor((1.0 * (val - min_value) / value_range) * dac_range)
+
+            return val
+
+        return [conert_data_value(v) for v in values]
+
     def to_plot_data(
         self,
         values: List[float] = None,
-        freq: float = TaborWaveformDACModeFreq.uint_16,
+        device_config: TaborDeviceConfig = None,
+        as_dac_values: bool = False,
     ):
-        y_vals = self.to_segment_values(values=values)
-        x_vals = [i * 1.0 / freq for i in range(len(y_vals))]
+        device_config = device_config or TABOR_DEFAULT_DEVICE_CONFIG
+        y_vals = (
+            self.to_segment_values(values=values)
+            if not as_dac_values
+            else self.to_dac_values(values=values)
+        )
+        x_vals = [i * 1.0 / device_config.freq for i in range(len(y_vals))]
         return x_vals, y_vals
 
     def clone(self):
@@ -134,16 +171,22 @@ class TaborDataSegment(dict):
         return TaborDataSegment(segment_id=self.segment_id, from_data_segment=self)
 
 
-class TaborSignDataSegment(TaborDataSegment):
+class TaborFunctionGeneratorSegmentFType(Enum):
+    sin = "sin"
+    square = "square"
+
+
+class TaborFunctionGeneratorSegment(TaborDataSegment):
     def __init__(
         self,
         freq: float,
         phase: float = 0,
+        function: TaborFunctionGeneratorSegmentFType = TaborFunctionGeneratorSegmentFType.sin,
         repeate: int = 0,
         amplitude: float = 1,
         segment_id: int = -1,
         smooth_edges: bool = True,
-        generator_freq: float = TaborWaveformDACModeFreq.uint_16,
+        generator_freq: float = None,
         last_value: float = None,
         min_value: float = 0,
         max_value: float = 1,
@@ -163,9 +206,20 @@ class TaborSignDataSegment(TaborDataSegment):
         self.freq = freq
         self.repeat = repeate
         self.phase = phase
-        self.generator_freq = generator_freq
+        self.generator_freq = generator_freq or TABOR_DEFAULT_DEVICE_CONFIG.freq
         self.smooth_edges = smooth_edges
         self.amplitude = amplitude
+        self.function = function
+
+    @property
+    def function(self) -> TaborFunctionGeneratorSegmentFType:
+        return TaborFunctionGeneratorSegmentFType(
+            self.get("function", TaborFunctionGeneratorSegmentFType.sin.value)
+        )
+
+    @function.setter
+    def function(self, val: TaborFunctionGeneratorSegmentFType):
+        self["function"] = val.value
 
     @property
     def amplitude(self) -> float:
@@ -185,7 +239,7 @@ class TaborSignDataSegment(TaborDataSegment):
 
     @property
     def generator_freq(self) -> float:
-        return self.get("generator_freq", TaborWaveformDACModeFreq.uint_16)
+        return self.get("generator_freq", TABOR_DEFAULT_DEVICE_CONFIG.freq)
 
     @generator_freq.setter
     def generator_freq(self, val: float):
@@ -228,11 +282,9 @@ class TaborSignDataSegment(TaborDataSegment):
         )
 
     def get_values(self):
-        return self.create_sine_waveform()
+        return self.create_waveform()
 
-    def create_sine_waveform(
-        self,
-    ):
+    def create_waveform(self):
         repeate = self.repeat
         signle_wave_steps = int(math.floor(self.generator_freq / self.freq))
         if self.smooth_edges:
@@ -250,12 +302,25 @@ class TaborSignDataSegment(TaborDataSegment):
 
         range_steps = signle_wave_steps * repeate
 
-        return [
-            self.amplitude
-            / 2
-            * (1 + math.sin(2.0 * math.pi * i / signle_wave_steps + self.phase))
-            for i in range(range_steps)
-        ]
+        def sin_func(i):
+            return 0.5 * (
+                1 + math.sin(2.0 * math.pi * i / signle_wave_steps + self.phase)
+            )
+
+        def square_func(i):
+            return (
+                0
+                if math.sin(2.0 * math.pi * i / signle_wave_steps + self.phase) > 0
+                else 1
+            )
+
+        func = sin_func
+        if self.function == TaborFunctionGeneratorSegmentFType.square:
+            func = square_func
+
+        vals = [self.amplitude * func(i) for i in range(range_steps)]
+
+        return vals
 
 
 class TaborWaveform(dict):
@@ -280,6 +345,8 @@ class TaborWaveform(dict):
             values.segment_id = self.channel % 2 + 1
 
         self.data_segment: TaborDataSegment = values
+        self.amplitude = amplitude
+        self.offset = offset
 
     @property
     def channel(self) -> int:
@@ -316,6 +383,7 @@ class TaborWaveform(dict):
     def to_plot_data(
         self,
         values: List[float] = None,
-        freq: float = TaborWaveformDACModeFreq.uint_16,
+        freq: float = None,
     ):
+        freq = freq or TABOR_DEFAULT_DEVICE_CONFIG.freq
         return self.data_segment.to_plot_data(values=values, freq=freq)
