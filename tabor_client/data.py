@@ -184,6 +184,7 @@ class TaborFunctionGeneratorSegment(TaborDataSegment):
         function: TaborFunctionGeneratorSegmentFType = TaborFunctionGeneratorSegmentFType.sin,
         repeate: int = 0,
         amplitude: float = 1,
+        offset: float = 0,
         segment_id: int = -1,
         smooth_edges: bool = True,
         generator_freq: float = None,
@@ -210,6 +211,7 @@ class TaborFunctionGeneratorSegment(TaborDataSegment):
         self.smooth_edges = smooth_edges
         self.amplitude = amplitude
         self.function = function
+        self.offset = offset
 
     @property
     def function(self) -> TaborFunctionGeneratorSegmentFType:
@@ -281,6 +283,14 @@ class TaborFunctionGeneratorSegment(TaborDataSegment):
             "The values property cannot be accessed in TaborSignDataSegment"
         )
 
+    @property
+    def offset(self) -> float:
+        return self.get("offset", 0)
+
+    @offset.setter
+    def offset(self, val: float):
+        self["offset"] = val
+
     def get_values(self):
         return self.create_waveform()
 
@@ -318,7 +328,7 @@ class TaborFunctionGeneratorSegment(TaborDataSegment):
         if self.function == TaborFunctionGeneratorSegmentFType.square:
             func = square_func
 
-        vals = [self.amplitude * func(i) for i in range(range_steps)]
+        vals = [self.offset + self.amplitude * func(i) for i in range(range_steps)]
 
         return vals
 

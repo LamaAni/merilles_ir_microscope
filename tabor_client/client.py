@@ -39,6 +39,7 @@ class TaborClient:
 
         self.__command_record: List[Tuple] = []
         self.__device_config = device_config
+        self.__channel_select_command = "INST:CHAN:SEL"
 
     def __del__(self):
         if self.__resource is not None:
@@ -130,11 +131,16 @@ class TaborClient:
             queries.append("*OPC?")
         query = self.__compose_query(*queries)
         log.debug("Sending query: " + query)
-        self.__append_to_command_record(query)
-        rsp = self.resource.query(query).split(self.seperator)
+        rsp = self.raw_query(query).split(self.seperator)
         if not force_list and len(queries) < 2:
             return rsp[0]
         return rsp
+
+    def raw_query(self, *queries: str):
+        for q in queries:
+            self.__append_to_command_record(queries)
+
+        return self.resource.query(self.__compose_query(*queries))
 
     def command(
         self,
@@ -161,8 +167,7 @@ class TaborClient:
         query = self.__compose_query(*compose)
 
         log.debug("Sending command: " + query)
-        self.__append_to_command_record(query)
-        rsp = self.resource.query(query).split(self.seperator)
+        rsp = self.raw_query(query).split(self.seperator)
         err = self.__parse_error_response(rsp[-1])
         rsp = rsp[:-1]
 
@@ -193,7 +198,7 @@ class TaborClient:
         except Exception as ex:
             raise ex from TaborClientException("Error while writing binary data")
 
-        err = self.__parse_error_response(self.resource.query(":SYST:ERR?"))
+        err = self.__parse_error_response(self.raw_query(":SYST:ERR?"))
         if err.code != 0:
             raise err from TaborClientException("Error writing binary data")
 
@@ -291,7 +296,7 @@ class TaborClient:
 
         for wav in wavs:
             self.command(
-                f":INST:CHAN:SEL {wav.channel}",
+                f":{self.__channel_select_command} {wav.channel}",
                 ":OUTP OFF" if turn_output_off_before_starting else None,
                 ":MODE DIR",
                 # ":INT NONE",
@@ -329,21 +334,31 @@ class TaborClient:
         *channel,
     ):
         self.command(
-            *[self.__compose_query(f":INST:CHAN:SEL {c}", ":OUTP OFF") for c in channel]
+            *[
+                self.__compose_query(
+                    f":{self.__channel_select_command} {c}", ":OUTP OFF"
+                )
+                for c in channel
+            ]
         )
 
     def select_channel(
         self,
         channel,
     ):
-        self.command(f":INST:CHAN:SEL {channel}")
+        self.command(f":{self.__channel_select_command} {channel}")
 
     def on(
         self,
         *channel,
     ):
         self.command(
-            *[self.__compose_query(f":INST:CHAN:SEL {c}", ":OUTP ON") for c in channel]
+            *[
+                self.__compose_query(
+                    f":{self.__channel_select_command} {c}", ":OUTP ON"
+                )
+                for c in channel
+            ]
         )
 
     # endregion
