@@ -49,7 +49,7 @@ def read_counts():
     rslt: str = client.query(":DIG: PULS: COUN?")
     assert "," in rslt, Exception("Failed to read")
     rslt = rslt.strip()
-    counts = [int(v) for v in re.split(r"[\s,]+", rslt.strip())]
+    counts = [int(v) for v in re.split(r"[\s,]+", rslt)]
     return counts
 
 
