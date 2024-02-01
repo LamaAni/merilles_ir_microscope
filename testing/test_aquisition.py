@@ -3,8 +3,8 @@ from tabor_client import TaborClient
 import time
 import re
 
-host = "134.74.27.64"
-# host = "134.74.27.62"
+# host = "134.74.27.64"
+host = "134.74.27.62"
 port = "5025"
 client = TaborClient(host, port, keep_command_and_query_record=True)
 
@@ -26,30 +26,27 @@ client.connect()
 # %%
 # Create counter
 client.command(
+    "*CLS",
     ":DIG:CHAN CH2",
-    ":DIG: TRIG: SOUR CH2",
-    ":DIG: CHAN: STAT ENAB",
-    ":DIG: TRIG: TYPE EDGE",
-    ":DIG: INIT OFF",
-    ":DIG: PULS INT, FIX, 1e9",
-    ":DIG: INIT ON",
-    ":DIG:PULS: TRIG: IMM",
+    ":DIG:TRIG:SOUR CH2",
+    ":DIG:CHAN:STAT ENAB",
+    ":DIG:TRIG:TYPE EDGE",
+    ":DIG:INIT OFF",
+    ":DIG:PULS INT, FIX, 1e-1",
+    ":DIG:INIT ON",
 )
-
-client.query(
-    ":DIG:ACQ:STAT?",
-    ":DIG:CHAN:STAT?",
-    ":DIG:PULS:COUN?",
-)
-
 
 # %%
 # Test counter
 
-for i in range(20):
+client.command(
+    ":DIG:PULS: TRIG: IMM",
+)
+
+for i in range(100):
     rslt: str = client.query(":DIG: PULS: COUN?")
     if "," in rslt:
-        counts = int(re.split(r"[\s,]+", rslt.strip()))
+        counts = [int(v) for v in re.split(r"[\s,]+", rslt.strip())]
         print(counts)
     else:
         print("Error reading counts")
