@@ -39,18 +39,34 @@ client.command(
 # %%
 # Test counter
 
+dt = 1e-2
 client.command(
     ":DIG:PULS: TRIG: IMM",
 )
 
-for i in range(100):
+
+def read_counts():
     rslt: str = client.query(":DIG: PULS: COUN?")
-    if "," in rslt:
-        counts = [int(v) for v in re.split(r"[\s,]+", rslt.strip())]
-        print(counts)
-    else:
-        print("Error reading counts")
-    time.sleep(20e-3)
+    assert "," in rslt, Exception("Failed to read")
+    counts = [int(v) for v in re.split(r"[\s,]+", rslt.strip())]
+    return counts
+
+
+for i in range(100):
+    try:
+        counts_0 = read_counts()
+        time.sleep(dt)
+        counts_1 = read_counts()
+        counts_per_sec = []
+        for i in range(len(counts_0)):
+            c0 = counts_0[i]
+            c1 = counts_1[i]
+            counts_per_sec.append((c1 - c0) * 1.0 / dt)
+
+        print(f"{' ,'.join(str(counts_per_sec))} [c/s]")
+    except Exception:
+        print(f"Read failed on iter {i}")
+
 
 # %% Marks command
 # time.sleep(2e-3)
