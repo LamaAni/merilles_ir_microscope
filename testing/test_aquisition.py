@@ -64,7 +64,7 @@ for i in range(100):
             c1 = counts_1[i]
             counts_per_sec.append((c1 - c0) * 1.0 / dt)
 
-        print(f"{' ,'.join(str(counts_per_sec))} [c/s]")
+        print(f"{[str(v) for v in counts_per_sec]} [c/s]")
     except Exception:
         print(f"Read failed on iter {i}")
 
