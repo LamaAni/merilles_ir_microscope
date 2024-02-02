@@ -32,14 +32,15 @@ client.command(
     ":DIG:CHAN:STAT ENAB",
     ":DIG:TRIG:TYPE EDGE",
     ":DIG:INIT OFF",
-    ":DIG:PULS INT, FIX, 1e-1",
+    ":INIT:CONT ON",
+    ":DIG:PULS INT, FIX, 0.1",
     ":DIG:INIT ON",
 )
+
 
 # %%
 # Test counter
 
-dt = 1e-2
 client.command(
     ":DIG:PULS: TRIG: IMM",
 )
@@ -53,6 +54,14 @@ def read_counts():
     return counts
 
 
+print(read_counts())
+
+
+# %%
+# Dynamic counting (failed)
+
+dt = 1e-2
+
 for i in range(100):
     try:
         counts_0 = read_counts()
@@ -64,7 +73,7 @@ for i in range(100):
             c1 = counts_1[i]
             counts_per_sec.append((c1 - c0) * 1.0 / dt)
 
-        print(f"{[str(v) for v in counts_per_sec]} [c/s]")
+        print(f"{[str(v) for v in counts_per_sec]} [c/s] ({counts_0}, {counts_1})")
     except Exception:
         print(f"Read failed on iter {i}")
 
