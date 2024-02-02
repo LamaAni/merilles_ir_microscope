@@ -42,7 +42,7 @@ client.command(
 # Test counter
 
 client.command(
-    ":DIG:PULS: TRIG: IMM",
+    ":DIG:PULS:TRIG:IMM",
 )
 
 
