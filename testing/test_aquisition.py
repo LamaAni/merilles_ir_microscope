@@ -3,8 +3,8 @@ from tabor_client import TaborClient
 import time
 import re
 
-# host = "134.74.27.64"
-host = "134.74.27.62"
+host = "134.74.27.64"
+# host = "134.74.27.62"
 port = "5025"
 client = TaborClient(host, port, keep_command_and_query_record=True)
 
@@ -23,38 +23,54 @@ client.connect()
 #     ":DIG:INIT ON",
 # )
 
+# *CLS
+# :DIG:INIT OFF
+# :DIG:CHAN CH2
+# :DIG:TRIG:SOUR CH2
+# :DIG:CHAN:STAT ENAB
+# :DIG:TRIG:TYPE EDGE
+# :INIT:CONT ON
+# :DIG:PULS INT, FIX, {dt}
+# :DIG:INIT ON
+
 # %%
+
+dt = 0.01
 # Create counter
 client.command(
     "*CLS",
+    ":DIG:INIT OFF",
     ":DIG:CHAN CH2",
     ":DIG:TRIG:SOUR CH2",
     ":DIG:CHAN:STAT ENAB",
     ":DIG:TRIG:TYPE EDGE",
-    ":DIG:INIT OFF",
     ":INIT:CONT ON",
-    ":DIG:PULS INT, FIX, 0.1",
+    f":DIG:PULS INT, FIX, {dt}",
     ":DIG:INIT ON",
 )
-
 
 # %%
 # Test counter
 
-client.command(
-    ":DIG:PULS:TRIG:IMM",
-)
-
 
 def read_counts():
-    rslt: str = client.query(":DIG: PULS: COUN?")
-    assert "," in rslt, Exception("Failed to read")
+    client.command(":DIG:PULS:TRIG:IMM")
+    time.sleep(dt)
+    rslt = client.query(
+        ":DIG: PULS:COUN?",
+    )
+    assert "," in rslt, Exception(f"Failed to read: {rslt}")
     rslt = rslt.strip()
     counts = [int(v) for v in re.split(r"[\s,]+", rslt)]
     return counts
 
 
-print(read_counts())
+while True:
+    try:
+        print(read_counts())
+
+    except Exception as ex:
+        print(f"Error reading counts, {ex}")
 
 
 # %%

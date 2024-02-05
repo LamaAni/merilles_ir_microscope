@@ -2,6 +2,7 @@ pyvisa
 pyvisa-py
 
 bole
+fastapi
 
 # NI daqmx
 PyDAQmx

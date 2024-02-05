@@ -1,4 +1,6 @@
+import enum
 import re
+from typing_extensions import deprecated
 import pyvisa
 import pyvisa.util
 
@@ -15,6 +17,79 @@ from tabor_client.config import (
 from tabor_client.exceptions import TaborClientException, TaborClientSocketException
 from tabor_client.data import TaborWaveform, TaborDataSegment
 from tabor_client.log import log
+
+
+class TaborClientRequestType(enum.Enum):
+    query = "query"
+    command = "command"
+
+
+class TaborClientRequest:
+    REQUEST_REGEXP = (
+        TABOR_REGEXP
+    ) = r"\s*([*][a-zA-Z0-9]+)(\?*)\s*([;]|$)|\s*(([\:]\s*[a-zA-Z0-9]+)+(\?*))\s+([^;\n]+|)\s*([;]|$)"
+
+    def __init__(
+        self, rtype: TaborClientRequestType, request: str, params: str | List[str]
+    ) -> None:
+        self.__rtype = rtype
+        self.__request: str = request
+        self.__params = [params] if isinstance(params, str) else params
+        self.__as_string: str = None
+
+    @property
+    def rtype(self) -> TaborClientRequestType:
+        return self.__rtype
+
+    @property
+    def params(self) -> List[str]:
+        return self.__params
+
+    @property
+    def request(self) -> List[str]:
+        return self.__request
+
+    @property
+    def as_string(self) -> str:
+        if self.__as_string is None:
+            self.__as_string = " ".join([self.request, *self.params])
+        return self.__as_string
+
+    @classmethod
+    def parse(cls, *requests: str) -> List["TaborClientRequest"]:
+        # Convert the requests to a string of requests.
+        # Split
+        requests = re.findall(
+            cls.REQUEST_REGEXP,
+            "\n".join(requests),
+            flags=re.MULTILINE,
+        )
+
+        rslt: List[TaborClientRequest] = []
+        for parsed in requests:
+            request = parsed[0] or parsed[3]
+            request = re.sub(r"[^A-Z0-9:]", "", request)
+            rtype = TaborClientRequestType.command
+            if parsed[1] == "?" or parsed[5] == "?":
+                rtype = TaborClientRequestType.query
+                request += "?"
+            params = []
+            if parsed[6]:
+                # This may have params
+                params = [parsed[6]]
+            request = TaborClientRequest(
+                rtype=rtype,
+                request=request,
+                params=params,
+            )
+            rslt.append(request)
+        return rslt
+
+    def __str__(self) -> str:
+        return self.as_string
+
+    def __repr__(self) -> str:
+        return self.rtype.value + " " + self.__str__()
 
 
 class TaborClient:
@@ -178,6 +253,22 @@ class TaborClient:
         if force_list and len(queries) < 2:
             return rsp[0]
         return rsp
+
+    @classmethod
+    def parse(
+        cls,
+        *requests: str | TaborClientRequest,
+    ):
+        requests: List[str] = list(requests)
+
+        parsed: List[TaborClientRequest] = []
+        for rq in requests:
+            if isinstance(rq, TaborClientRequest):
+                parsed.append(rq)
+            else:
+                for r in TaborClientRequest.parse(rq):
+                    parsed.append(r)
+        return parsed
 
     def write_binary(
         self,
