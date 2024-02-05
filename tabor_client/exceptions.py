@@ -21,6 +21,7 @@ class TaborClientSocketException(TaborClientException):
                 code = int(code)
             except Exception:
                 pass
+        self.message = "\n".join([str(v) for v in args])
         if code > -1:
             args = list(args) + [code]
         super().__init__(*args)

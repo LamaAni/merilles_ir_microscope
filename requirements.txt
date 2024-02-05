@@ -2,6 +2,7 @@ pyvisa
 pyvisa-py
 
 bole
+uvicorn
 fastapi
 
 # NI daqmx

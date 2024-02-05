@@ -102,6 +102,7 @@ class TaborClient:
         read_bytes_chunk: int = 4096,
         keep_command_and_query_record: bool = False,
         device_config: TaborDeviceConfig = None,
+        reconnect_timeout: int = 1,
     ) -> None:
         self.resource_name = f"TCPIP0::{host}::{port}::SOCKET"
         self.resource_manager = pyvisa.ResourceManager("@py")
@@ -109,16 +110,26 @@ class TaborClient:
         self.seperator = ";"
         self.raise_errors = raise_errors
         self.timeout = timeout
+        self.reconnect_timeout = reconnect_timeout
         self.read_bytes_chunk = read_bytes_chunk
         self.keep_command_and_query_record = keep_command_and_query_record
 
         self.__command_record: List[Tuple] = []
         self.__device_config = device_config
         self.__channel_select_command = "INST:CHAN:SEL"
+        self.__last_called = 0
 
     def __del__(self):
         if self.__resource is not None:
             self.disconnect()
+
+    @property
+    def last_called(self):
+        return datetime.fromtimestamp(self.__last_called)
+
+    @property
+    def requires_reconnect(self) -> bool:
+        return datetime.now().timestamp() - self.__last_called > self.reconnect_timeout
 
     @property
     def device_config(self):
@@ -144,12 +155,21 @@ class TaborClient:
             lns.append(f"[{rcd[0].isoformat()}] {rcd[1]}")
         return lns
 
-    def connect(self):
+    def __create_http_resource(self):
+        if self.__resource:
+            try:
+                self.resource.close()
+            except Exception:
+                pass
+
         self.__resource = self.resource_manager.open_resource(self.resource_name)
         self.__resource.read_termination = "\n"
         self.__resource.write_termination = "\n"
         self.__resource.timeout = self.timeout
+        return self.__resource
 
+    def connect(self):
+        self.__create_http_resource()
         self.clear_error_list()
 
         model = self.query(":SYST:iNF:MODel?")
@@ -176,9 +196,10 @@ class TaborClient:
         self.__resource = None
 
     def __assert_connected(self):
-        assert self.resource is not None, TaborClientException(
-            "Not connected, please run .connect()"
-        )
+        if not self.resource:
+            self.connect()
+        if self.requires_reconnect:
+            self.__create_http_resource()
 
     def __clean_queries(self, queries: Iterable[str]):
         return [q.strip() for q in queries if q is not None and len(q.strip()) > 0]
