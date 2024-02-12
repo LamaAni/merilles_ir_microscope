@@ -23,16 +23,6 @@ client.connect()
 #     ":DIG:INIT ON",
 # )
 
-*CLS
-:DIG:INIT OFF
-:DIG:CHAN CH2
-:DIG:TRIG:SOUR CH2
-:DIG:CHAN:STAT ENAB
-:DIG:TRIG:TYPE EDGE
-:INIT:CONT ON
-:DIG:PULS INT, FIX, {dt}
-:DIG:INIT ON
-
 # %%
 
 dt = 0.01
