@@ -23,6 +23,7 @@ client.connect()
 #     ":DIG:INIT ON",
 # )
 
+<<<<<<< HEAD
 # *CLS
 # :DIG:INIT OFF
 # :DIG:CHAN CH2
@@ -33,6 +34,8 @@ client.connect()
 # :DIG:PULS INT, FIX, {dt}
 # :DIG:INIT ON
 
+=======
+>>>>>>> e4e4282b78f2d08f9b3bf0299d0b26121f5f2544
 # %%
 
 dt = 0.01
