@@ -3,8 +3,8 @@ from tabor_client import TaborClient
 import time
 import re
 
-host = "134.74.27.64"
-# host = "134.74.27.62"
+# host = "134.74.27.64"
+host = "134.74.27.62"
 port = "5025"
 client = TaborClient(host, port, keep_command_and_query_record=True)
 
@@ -23,15 +23,15 @@ client.connect()
 #     ":DIG:INIT ON",
 # )
 
-*CLS
-:DIG:INIT OFF
-:DIG:CHAN CH2
-:DIG:TRIG:SOUR CH2
-:DIG:CHAN:STAT ENAB
-:DIG:TRIG:TYPE EDGE
-:INIT:CONT ON
-:DIG:PULS INT, FIX, {dt}
-:DIG:INIT ON
+# *CLS
+# :DIG:INIT OFF
+# :DIG:CHAN CH2
+# :DIG:TRIG:SOUR CH2
+# :DIG:CHAN:STAT ENAB
+# :DIG:TRIG:TYPE EDGE
+# :INIT:CONT ON
+# :DIG:PULS INT, FIX, {dt}
+# :DIG:INIT ON
 
 # %%
 
@@ -39,12 +39,12 @@ dt = 0.01
 # Create counter
 client.command(
     "*CLS",
-    ":DIG:INIT OFF",
     ":DIG:CHAN CH2",
     ":DIG:TRIG:SOUR CH2",
     ":DIG:CHAN:STAT ENAB",
     ":DIG:TRIG:TYPE EDGE",
     ":INIT:CONT ON",
+    ":DIG:INIT OFF",
     f":DIG:PULS INT, FIX, {dt}",
     ":DIG:INIT ON",
 )

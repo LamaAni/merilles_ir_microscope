@@ -3,6 +3,7 @@ import re
 from typing_extensions import deprecated
 import pyvisa
 import pyvisa.util
+import pyvisa.constants
 
 from ast import Tuple
 from datetime import datetime
@@ -162,7 +163,10 @@ class TaborClient:
             except Exception:
                 pass
 
-        self.__resource = self.resource_manager.open_resource(self.resource_name)
+        self.__resource = self.resource_manager.open_resource(
+            self.resource_name,
+            access_mode=pyvisa.constants.AccessModes.no_lock,
+        )
         self.__resource.read_termination = "\n"
         self.__resource.write_termination = "\n"
         self.__resource.timeout = self.timeout

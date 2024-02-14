@@ -5,16 +5,16 @@ from tabor_client import TaborClient, TaborClientSocketException
 
 api = FastAPI()
 
-global ACTIVE_CLIENTS
 ACTIVE_CLIENTS: Dict[str, TaborClient] = {}
 
 
 def get_client(hostname: str = None, port: int = 5025):
-    con_str = f"{hostname}:{port}"
-    client: TaborClient = ACTIVE_CLIENTS.get(con_str, None)
+    connection_string = f"{hostname}:{port}"
+    client: TaborClient = ACTIVE_CLIENTS.get(connection_string, None)
     if client is None:
         client = TaborClient(host=hostname, port=port)
-        ACTIVE_CLIENTS[con_str] = client
+        ACTIVE_CLIENTS[connection_string] = client
+        print("Created client: " + connection_string)
     return client
 
 
