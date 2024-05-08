@@ -26,9 +26,9 @@ class TaborClientRequestType(enum.Enum):
 
 
 class TaborClientRequest:
-    REQUEST_REGEXP = (
-        TABOR_REGEXP
-    ) = r"\s*([*][a-zA-Z0-9]+)(\?*)\s*([;]|$)|\s*(([\:]\s*[a-zA-Z0-9]+)+(\?*))\s+([^;\n]+|)\s*([;]|$)"
+    REQUEST_REGEXP = TABOR_REGEXP = (
+        r"\s*([*][a-zA-Z0-9]+)(\?*)\s*([;]|$)|\s*(([\:]\s*[a-zA-Z0-9]+)+(\?*))\s+([^;\n]+|)\s*([;]|$)"
+    )
 
     def __init__(
         self, rtype: TaborClientRequestType, request: str, params: str | List[str]
