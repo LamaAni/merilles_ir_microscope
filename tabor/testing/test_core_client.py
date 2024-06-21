@@ -1,6 +1,6 @@
 import math
-from tabor_client import TaborClient
-from tabor_client.data import (
+from tabor.tabor_client import TaborClient
+from tabor.tabor_client.data import (
     TaborFunctionGeneratorSegment,
     TaborFunctionGeneratorSegmentFType,
     TaborWaveform,

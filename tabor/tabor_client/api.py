@@ -1,7 +1,7 @@
 from typing import Dict
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse, Response
-from tabor_client import TaborClient, TaborClientSocketException
+from tabor.tabor_client import TaborClient, TaborClientSocketException
 
 api = FastAPI()
 
