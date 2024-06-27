@@ -1,5 +1,5 @@
 # %% Load config
-from tabor_client import TaborClient
+from tabor.tabor_client import TaborClient
 import time
 import re
 

@@ -1,8 +1,8 @@
 # %% Imports
 import math
-from tabor_client import TaborClient
+from tabor.tabor_client import TaborClient
 from matplotlib import pyplot as plt
-from tabor_client.data import (
+from tabor.tabor_client.data import (
     TaborFunctionGeneratorSegment,
     TaborDataSegment,
     TaborWaveform,
@@ -11,39 +11,24 @@ from tabor_client.data import (
 
 
 # Create client
-host = "134.74.27.56"
+host = "134.74.27.64"
 port = "5025"
 client = TaborClient(host, port, keep_command_and_query_record=True)
-print("Client created")
 client.connect()
-print("Client connected")
-client.raw_query("*IDN?", "*OPC?")
-client.__channel_select_command = "INST:SEL"
-
-
-# %% Send sepcific commands
-# client.raw_query("*RST", "*OPC?")
+client.select_channel(1)
+print("\n".join(client.print_command_record()))
+# %% RAW COMMANDS
 client.raw_query(
-    # "*CLS",
-    ":INST:SEL 1",
-    # ":VOLT 0.2",
-    ":VOLT:LEV 0.5",
-    ":VOLT:OFFS 0.5",
+    "*CLS",
+    ":INST:CHAN:SEL 2",
+    ":VOLT 0.5",
+    # ":VOLT:LEV 0.2",
+    ":VOLT:OFFS 0",
     # "*OPC?",
     ":OUTP ON",
     ":SYST:ERR?",
 )
-# client.command(":INST:CHAN 1")
 
-# %% Send sepcific commands
-client.raw_query(
-    # "*CLS",
-    ":INST:SEL 1",
-    # ":VOLT 0.2",
-    # "*OPC?",
-    ":OUTP OFF",
-    ":SYST:ERR?",
-)
 # %% Create functions
 
 
@@ -107,7 +92,7 @@ def output_func(
 client.reset()
 
 # %%  Turn off
-client.off(1)
+client.off(1, 2)
 
 # %% Turn on
 client.on(1, 2)
@@ -115,10 +100,10 @@ client.on(1, 2)
 # %% Set voltatge
 
 # %% Test function
-# client.command_record.clear()
+client.command_record.clear()
 
 client.off(1)
-# client.voltage_out(1, 0)
+client.voltage_out(1, 0)
 
 output_func(
     1,
@@ -133,8 +118,8 @@ print("\n".join(client.print_command_record()))
 
 # %% Test channel output
 
-# client.select_channel(2)
-# print(client.query(":INST:CHAN:OFFS:DEF?"))
+client.select_channel(2)
+print(client.query(":INST:CHAN:OFFS:DEF?"))
 # client.command(
 #     ":MODE DIR",
 #     ":VOLT 0.1",

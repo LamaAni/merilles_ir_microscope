@@ -9,15 +9,15 @@ from ast import Tuple
 from datetime import datetime
 from typing import Iterable, List, Union
 from pyvisa.resources.tcpip import TCPIPInstrument
-from tabor_client.config import (
+from tabor.tabor_client.config import (
     TaborDefaultDeviceConfig,
     TaborDeviceConfig,
     TaborP9082DeviceConfig,
 )
 
-from tabor_client.exceptions import TaborClientException, TaborClientSocketException
-from tabor_client.data import TaborWaveform, TaborDataSegment
-from tabor_client.log import log
+from tabor.tabor_client.exceptions import TaborClientException, TaborClientSocketException
+from tabor.tabor_client.data import TaborWaveform, TaborDataSegment
+from tabor.tabor_client.log import log
 
 
 class TaborClientRequestType(enum.Enum):

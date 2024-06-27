@@ -1,11 +1,11 @@
 from enum import Enum
 import math
 from typing import List, Union
-from tabor_client.config import (
+from tabor.tabor_client.config import (
     TABOR_DEFAULT_DEVICE_CONFIG,
     TaborDeviceConfig,
 )
-from tabor_client.consts import TABOR_SEGMENT_MIN_LENGTH, TABOR_SEGMENT_MIN_SIZE_STEP
+from tabor.tabor_client.consts import TABOR_SEGMENT_MIN_LENGTH, TABOR_SEGMENT_MIN_SIZE_STEP
 
 
 class TaborDataSegment(dict):
