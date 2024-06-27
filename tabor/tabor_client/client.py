@@ -15,7 +15,10 @@ from tabor.tabor_client.config import (
     TaborP9082DeviceConfig,
 )
 
-from tabor.tabor_client.exceptions import TaborClientException, TaborClientSocketException
+from tabor.tabor_client.exceptions import (
+    TaborClientException,
+    TaborClientSocketException,
+)
 from tabor.tabor_client.data import TaborWaveform, TaborDataSegment
 from tabor.tabor_client.log import log
 

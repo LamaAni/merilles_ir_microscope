@@ -396,4 +396,4 @@ class TaborWaveform(dict):
         freq: float = None,
     ):
         freq = freq or TABOR_DEFAULT_DEVICE_CONFIG.freq
-        return self.data_segment.to_plot_data(values=values, freq=freq)
+        return self.data_segment.to_plot_data(values=values)

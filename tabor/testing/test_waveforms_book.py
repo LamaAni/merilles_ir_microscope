@@ -11,7 +11,8 @@ from tabor.tabor_client.data import (
 
 
 # Create client
-host = "134.74.27.64"
+# host = "134.74.27.64"
+host = "134.74.27.16"
 port = "5025"
 client = TaborClient(host, port, keep_command_and_query_record=True)
 client.connect()
@@ -72,11 +73,12 @@ def output_func(
 ):
     wav = TaborWaveform(
         channel=channel,
+        offset=0,
         values=TaborFunctionGeneratorSegment(
             freq=freq,
             amplitude=amplitude,
             offset=offset,
-            phase=math.pi * 1,
+            phase=math.pi * 0,
             function=func,
         ),
     )
@@ -98,19 +100,22 @@ client.off(1, 2)
 client.on(1, 2)
 
 # %% Set voltatge
+channel_num = 2
 
+client.voltage_out(channel_num, 0.2, False)
 # %% Test function
+
 client.command_record.clear()
 
-client.off(1)
-client.voltage_out(1, 0)
+client.off(channel_num)
+client.voltage_out(channel_num, 0.2)
 
 output_func(
-    1,
-    freq=1e5,
+    channel_num,
+    freq=2.5e5,
     amplitude=0.3,
     # amplitude=0.1,
-    offset=0.2,
+    offset=0,
     func=TaborFunctionGeneratorSegmentFType.square,
     as_dac_values=True,
 )
