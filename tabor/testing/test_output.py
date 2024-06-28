@@ -12,8 +12,7 @@ port = "5025"
 
 
 # %% Connect to tabor
-client = TaborClient(host, port, keep_command_and_query_record=True)
-client.connect()
+client = TaborClient(host, port, keep_command_and_query_record=True).connect()
 
 # %%
 
@@ -36,16 +35,11 @@ client.command(
 
 # %% Test output waveform.
 
-
-def sine(max_t=1e-6, freq=1e7, gen_freq=1e9):
-    max_t = 1e-6
-    ncount = int(max_t / gen_freq)
-    x = np.linspace(0, max_t, ncount)
-    y = np.sin(x * freq * np.pi)
-
-    pass
-
+import pandas as pd
+import numpy as np
 
 wav = TaborWaveform(channel_number, [0.3])
 plt.plot(*wav.to_plot_data())
 client.waveform_out(wav)
+
+# %%

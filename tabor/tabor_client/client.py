@@ -204,6 +204,8 @@ class TaborClient:
             f"Interaction frequency set, and retrived as: {self.query(':FREQ:RAST?')}"
         )
 
+        return self
+
     def disconnect(self):
         self.__resource.close()
         self.__resource = None
