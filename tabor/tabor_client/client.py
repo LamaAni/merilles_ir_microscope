@@ -175,6 +175,12 @@ class TaborClient:
         self.__resource.timeout = self.timeout
         return self.__resource
 
+    def ping(self):
+        start = datetime.now()
+        model = self.query(":SYST:iNF:MODel?")
+        dt = datetime.now() - start
+        return dt, model
+
     def connect(self):
         self.__create_http_resource()
         self.clear_error_list()
