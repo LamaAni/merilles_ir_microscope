@@ -12,3 +12,4 @@ PyDAQmx
 numpy
 matplotlib
 pandas
+jupyter
