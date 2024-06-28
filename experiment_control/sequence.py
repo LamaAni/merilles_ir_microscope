@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List
 from experiment_control.interfaces import DeviceInterface
 from experiment_control.sequence_channel import SequenceChannel
 
@@ -11,6 +11,10 @@ class SequenceInput:
     pass
 
 
+class SequenceEvent:
+    pass
+
+
 class Sequence:
     """Implements an experiment sequence to be executed. The sequence will
     than generate an output to be consumed by input and output channels.
@@ -19,14 +23,26 @@ class Sequence:
     def __init__(
         self,
     ) -> None:
-        self.__out: Dict[str, SequenceOutput] = {}
-        self.__in: Dict[str,]
+        # NOTE: currently inefficient, need some kind of sorted list.
+        # future implementation
+        self.__events: List[SequenceEvent] = {}
+        """A list of events in this sequence"""
         self.__t: float = 0
+        """The current time"""
+
+    @property
+    def events(self) -> Iterable:
+        """A list of events (unsorted)"""
+        return self.__events
 
     @property
     def t(self) -> float:
-        """The current experiment time, in seconds, from the experiment start time"""
+        """The current time (set and get)"""
         return self.__t
+
+    @t.setter
+    def t(self, val: float):
+        self.__t = val
 
     # endregion
 
@@ -39,6 +55,7 @@ class Sequence:
         self.__t += dt
 
     def goto(self, t: float):
+        """Set the current time"""
         assert t > 0, Exception("Cannot set a time lower then zero")
         self.__t = t
 
