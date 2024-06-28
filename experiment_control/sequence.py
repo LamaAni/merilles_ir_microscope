@@ -3,67 +3,30 @@ from experiment_control.interfaces import DeviceInterface
 from experiment_control.sequence_channel import SequenceChannel
 
 
+class SequenceOutput:
+    pass
+
+
+class SequenceInput:
+    pass
+
+
 class Sequence:
-    """Implements an experiment sequence to be executed. The sequnce
-    contains the full IO configuration for an experiment.
+    """Implements an experiment sequence to be executed. The sequence will
+    than generate an output to be consumed by input and output channels.
     """
 
     def __init__(
         self,
-        freqeuency: float = None,
     ) -> None:
-        self.__channels: Dict[str, SequenceChannel] = {}
-        self.__devices: Dict[str, DeviceInterface] = {}
+        self.__out: Dict[str, SequenceOutput] = {}
+        self.__in: Dict[str,]
         self.__t: float = 0
-        self.freqeuency = freqeuency
-
-    @property
-    def channels(self):
-        """Holds the channel by name implementation for the sequence"""
-        return self.__channels
-
-    @property
-    def devices(self):
-        """A list of active devices"""
-        return self.__devices
 
     @property
     def t(self) -> float:
         """The current experiment time, in seconds, from the experiment start time"""
         return self.__t
-
-    # region Device and channel control
-    def add_device(
-        self,
-        name: str,
-        device: DeviceInterface,
-    ):
-        self.__devices[name] = device
-
-    def add_channel(
-        self,
-        name: str,
-        device_name: str,
-        physical_address: str | Any,
-        allow_missing_device: bool = False,
-    ):
-        assert allow_missing_device or device_name in self.devices, Exception(
-            "Device not configured: " + device_name
-        )
-
-        if name in self.channels:
-            raise Exception("Channel already exists: " + name)
-
-        self.channels[name] = SequenceChannel(
-            name=name,
-            device_name=device_name,
-            physical_address=physical_address,
-        )
-
-    def __validate_channels(self, channels: List[str]):
-        for c in channels:
-            if c not in self.channels:
-                raise ValueError("Channel not found: " + c)
 
     # endregion
 
@@ -89,7 +52,7 @@ class Sequence:
         overwrite: bool = True,
     ):
         self.__validate_channels(channel)
-        frequency = frequency or self.freqeuency
+        frequency = frequency or self.frequency
 
         assert timedeltas is not None or frequency is not None, ValueError(
             "You must provide either a frequency or timedelats (no default frequency defined)"
@@ -101,7 +64,7 @@ class Sequence:
         assert len(data) > 0, ValueError("You must send at least one value to write")
 
         if timedeltas is None:
-            # Using freqeuency to determine the time offset in seconds
+            # Using frequency to determine the time offset in seconds
             dt = 1 / frequency
             timedeltas = [dt for _ in range(len(data))]
 
