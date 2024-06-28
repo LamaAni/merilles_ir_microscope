@@ -7,3 +7,8 @@ fastapi
 
 # NI daqmx
 PyDAQmx
+
+# Data analysis
+numpy
+matplotlib
+pandas
