@@ -1,12 +1,25 @@
-from tabor.tabor_client.consts import TABOR_SEGMENT_MIN_LENGTH, TABOR_SEGMENT_MIN_SIZE_STEP
+from tabor.tabor_client.consts import (
+    TABOR_SEGMENT_MIN_LENGTH,
+    TABOR_SEGMENT_MIN_SIZE_STEP,
+    TABOR_SEGMENT_VOLT_MAX,
+    TABOR_SEGMENT_VOLT_MIN,
+)
 
 
 class TaborDeviceConfig:
-    dac_is_16_bit = True
-    freq = int(2.5e9)
-    segment_min_size_step = TABOR_SEGMENT_MIN_SIZE_STEP
-    segment_min_length = TABOR_SEGMENT_MIN_LENGTH
+    """Configuration class for a tabor device"""
+
     model = "any"
+
+    # DAC
+    freq = float(2.5e9)
+    dac_is_16_bit = True
+    min_voltage_out = TABOR_SEGMENT_VOLT_MIN
+    max_voltage_out = TABOR_SEGMENT_VOLT_MAX
+
+    # SEGMENT SETTINGS
+    segment_min_length = TABOR_SEGMENT_MIN_LENGTH
+    segment_min_size_step = TABOR_SEGMENT_MIN_SIZE_STEP
 
     @property
     def data_bits(self) -> int:

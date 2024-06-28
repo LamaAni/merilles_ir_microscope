@@ -7,7 +7,7 @@ import pyvisa.constants
 
 from ast import Tuple
 from datetime import datetime
-from typing import Iterable, List, Union
+from typing import Callable, Iterable, List, Union
 from pyvisa.resources.tcpip import TCPIPInstrument
 from tabor.tabor_client.config import (
     TaborDefaultDeviceConfig,
@@ -146,6 +146,8 @@ class TaborClient:
     @property
     def command_record(self) -> List[Tuple]:
         return self.__command_record
+
+    # region Core client methods
 
     def __append_to_command_record(self, cmd_sent: str):
         if not self.keep_command_and_query_record:
@@ -362,6 +364,57 @@ class TaborClient:
 
         return buff
 
+    # endregion
+
+    # region Simple command methods
+    # -------------------
+
+    def clear_error_list(self):
+        self.command("*CLS")
+
+    def reset(self):
+        self.command(
+            "*CLS",
+            "*RST",
+            "*OPC?",
+        )
+
+    def off(
+        self,
+        *channel,
+    ):
+        self.command(
+            *[
+                self.__compose_query(
+                    f":{self.__channel_select_command} {c}", ":OUTP OFF"
+                )
+                for c in channel
+            ]
+        )
+
+    def select_channel(
+        self,
+        channel,
+    ):
+        self.command(f":{self.__channel_select_command} {channel}")
+
+    def on(
+        self,
+        *channel,
+    ):
+        self.command(
+            *[
+                self.__compose_query(
+                    f":{self.__channel_select_command} {c}", ":OUTP ON"
+                )
+                for c in channel
+            ]
+        )
+
+    # endregion
+
+    # region waveforms and voltage out
+
     def write_segments(self, *segments: Union[TaborDataSegment, TaborWaveform]):
         assert all(
             isinstance(
@@ -402,22 +455,18 @@ class TaborClient:
                 datatype=self.device_config.binary_data_type,
             )
 
-    # region Simple methods
-    # -------------------
-
-    def clear_error_list(self):
-        self.command("*CLS")
-
-    # endregion
-
-    # region Simple command methods
-    # -------------------
-
     def waveform_out(
         self,
-        *wavs: TaborWaveform,
+        *wavs: Union[TaborWaveform, TaborDataSegment, List[float]],
         turn_output_off_before_starting: bool = True,
     ):
+        def to_wav(wav: Union[TaborWaveform, TaborDataSegment, List[float]]):
+            if isinstance(wav, TaborWaveform):
+                return wav
+            elif isinstance(wav, TaborDataSegment):
+                return TaborWaveform()
+
+        wavs = [to_wav(w) for w in wavs]
         for wav in wavs:
             self.write_segments(wav)
 
@@ -427,65 +476,90 @@ class TaborClient:
                 ":OUTP OFF" if turn_output_off_before_starting else None,
                 ":MODE DIR",
                 # ":INT NONE",
-                f":VOLT:AMPL {wav.amplitude}",
+                # f":VOLT:AMPL {wav.amplitude}",
                 f":VOLT:OFFS {wav.offset}",
                 ":FUNC:MODE ARB",
                 f":FUNC:MODE:SEGM {wav.data_segment.segment_id}",
                 "*OPC?",
                 ":OUTP ON",
             )
-        # self.query("*OPC?")
 
     def voltage_out(
         self,
         channel: int,
-        value: float,
+        data: Union[TaborWaveform, TaborDataSegment, List[float], float],
         turn_output_off_before_starting: bool = True,
     ):
-        wav = TaborWaveform(channel=channel, values=[value])
+        if isinstance(data, TaborWaveform):
+            data.channel = channel
+        else:
+            data = TaborWaveform(channel, data)
 
-        self.waveform_out(
-            wav,
+        return self.waveform_out(
+            data,
             turn_output_off_before_starting=turn_output_off_before_starting,
         )
 
-    def reset(self):
+    # endregion
+
+    # region Counter in
+
+    def counter_prepare(
+        self,
+        dt: float,
+        *channels: int,
+        trigger_level: float = 0.1,
+    ):
+        cmnd_list = []
+        for channel in channels:
+            cmnd_list += [
+                f":DIG:CHAN CH{channel}",
+                f":DIG:TRIG:SOUR CH{channel}",
+                f":DIG:TRIG:LEV1 {trigger_level}",
+                ":DIG:CHAN:STAT ENAB",
+                ":DIG:TRIG:TYPE EDGE",
+                f":DIG:PULS INT, FIX, {dt}",
+            ]
+        return self.command("*CLS", *cmnd_list)
+
+    def counter_trigger(self):
+        return self.command(":DIG:PULS:TRIG:IMM")
+
+    def counter_read(
+        self,
+        *channels: int,
+    ) -> List[int]:
+        rslt = self.query(":DIG:PULS:COUN?")
+        assert "," in rslt, Exception(f"Failed to read: {rslt}")
+        rslt = rslt.strip()
+        counts = [int(v) for v in re.split(r"[\s,]+", rslt)]
+        if channels:
+            counts = [counts[c] for c in channels]
+        return counts
+
+    # endregion
+
+    # region marker data
+
+    def marker_select(self, channel: int, marker: int, get_command: bool = False):
+        command = [
+            f":{self.__channel_select_command} {channel}",
+            f":MARK:SEL {marker}",
+        ]
+        if get_command:
+            return command
+        return self.command(*command)
+
+    def marker_on(self, channel: int, marker: int):
         self.command(
-            "*CLS",
-            "*RST",
-            "*OPC?",
+            self.marker_select(channel=channel, marker=marker, get_command=True),
+            ":MARK ON",
         )
 
-    def off(
-        self,
-        *channel,
-    ):
+    def marker_off(self, channel: int, marker: int):
         self.command(
-            *[
-                self.__compose_query(
-                    f":{self.__channel_select_command} {c}", ":OUTP OFF"
-                )
-                for c in channel
-            ]
-        )
-
-    def select_channel(
-        self,
-        channel,
-    ):
-        self.command(f":{self.__channel_select_command} {channel}")
-
-    def on(
-        self,
-        *channel,
-    ):
-        self.command(
-            *[
-                self.__compose_query(
-                    f":{self.__channel_select_command} {c}", ":OUTP ON"
-                )
-                for c in channel
-            ]
+            self.marker_select(channel=channel, marker=marker, get_command=True),
+            ":MARK OFF",
         )
 
     # endregion
