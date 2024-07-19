@@ -83,12 +83,12 @@ def marker_values_to_binary_data(
                 break
             # Shift by 4
             # 0010 --> 00100000
-            num = num << 4  # shift 4
+            
             # Do a or operation, join two, e.g.
             # 0100 |
             # 0001 =
             # 0101
-            num = num | to_channel_bits(vals[idx])
+            num = to_channel_bits(vals[idx]) << 4 | num
             idx += 1
 
         data.append(num)
