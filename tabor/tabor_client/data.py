@@ -50,10 +50,6 @@ class TaborDataSegment(dict):
     def is_binary(self) -> bool:
         return self.get("is_binary", None)
 
-    @segment_id.setter
-    def is_binary(self, val: bool):
-        self["is_binary"] = val
-
     @property
     def segment_id(self) -> int:
         return self.get("segment_id", None)

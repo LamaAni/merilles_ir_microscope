@@ -1,5 +1,5 @@
 # %% Define client
-from typing import List
+from typing import List, Union
 from tabor.tabor_client import TaborClient, TaborFunctionSegment
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,6 +10,8 @@ import re
 # host = "134.74.27.64"
 host = "134.74.27.16"
 port = "5025"
+
+# %% Connect
 
 client = TaborClient(host, port).connect()
 
@@ -48,35 +50,74 @@ client.command(":MARK ON")
 # %% Marker off
 client.command(":MARK OFF")
 
-# %% Marker data upload
+# %% Marker data config
 
 
-def marker_values_to_binary_data(vals: List[float]):
-    def to_bit(v):
-        return "0" if v <= 0 else "1"
+def marker_values_to_binary_data(
+    vals: List[Union[float, int, bool]],
+    channel: int = 1,
+    use_8_bits: bool = True,
+):
+    assert channel > 0 and channel < 5, ValueError(
+        f"Channel {channel} out of range, 1-4"
+    )
 
-    def to_bit_set(v):
-        return f"11{to_bit(v)}1"
+    def to_channel_bits(val):
+        # Use bit shift to move the bits to the correct
+        # value.
+        # If was channel = 2, then starting with 1,
+        # 1<<1 -> 0001 --> 0010
+        return 1 << channel - 1 if val > 0 else 0
 
     idx = 0
     data = []
     while idx < len(vals):
-
-        def next_part():
-            nonlocal idx
-            v = vals[idx] if idx < len(vals) else 0
+        num = to_channel_bits(vals[idx])
+        idx += 1
+        if use_8_bits:
+            if idx >= len(vals):
+                # Not enough to compose the next
+                # 8 bit.
+                # Skip (should error)
+                break
+            # Shift by 4
+            # 0010 --> 00100000
+            num = num << 4  # shift 4
+            # Do a or operation, join two, e.g.
+            # 0100 |
+            # 0001 =
+            # 0101
+            num = num | to_channel_bits(vals[idx])
             idx += 1
-            return to_bit_set(v)
 
-        num_as_bits = next_part()
-        num_as_bits = next_part() + num_as_bits
-        data.append(int(num_as_bits, base=2))
+        data.append(num)
 
-    return data
+    # This is an 8 bit operation in the case where.
+    # we have the 8 bits for the values.
+    return bytes(data)
 
 
-data = marker_values_to_binary_data([1] * int(1024 / 8) + [0] * int(1024 / 8))
+# Should print all channel 1 options. Notice that
+# the number of bytes is always 1, which
+# means we are generating the proper data.
+# e.g. 00010001 -> means two 1 values in channel 1.
+for d in [
+    marker_values_to_binary_data([1, 1]),
+    marker_values_to_binary_data([0, 0]),
+    marker_values_to_binary_data([1, 0]),
+    marker_values_to_binary_data([0, 1]),
+]:
+    # Note that the binary data is capped at the 5th bit
+    # this is the way bin function works.
+    print(bin(d[0]), f"Number of bytes: {len(d)}")
+
+
+# %% Upload marker data.
+data = marker_values_to_binary_data(
+    [1] * int(1024 / 8) + [0] * int(1024 / 8),
+)
 client.command("*CLS")
-client.write_binary(":MARK:DATA", data, "B")
+# Choose the write method for bytes
+client.write_binary(":MARK:DATA", data, "b")
 
 # %%
