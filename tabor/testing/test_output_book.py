@@ -77,6 +77,6 @@ def marker_values_to_binary_data(vals: List[float]):
 
 data = marker_values_to_binary_data([1] * int(1024 / 8) + [0] * int(1024 / 8))
 client.command("*CLS")
-client.write_binary(":MARK:DATA", data)
+client.write_binary(":MARK:DATA", data, "B")
 
 # %%

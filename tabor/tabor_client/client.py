@@ -9,6 +9,7 @@ from ast import Tuple
 from datetime import datetime
 from typing import Callable, Iterable, List, Union
 from pyvisa.resources.tcpip import TCPIPInstrument
+from pyvisa.util import BINARY_DATATYPES
 from tabor.tabor_client.config import (
     TaborDefaultDeviceConfig,
     TaborDeviceConfig,
@@ -312,7 +313,7 @@ class TaborClient:
         self,
         command: str,
         data: Union[Iterable, bytes, List[float]],
-        datatype: str = None,
+        datatype: BINARY_DATATYPES = None,
     ):
         self.__assert_connected()
         query = self.__compose_query("*OPC?", command)
