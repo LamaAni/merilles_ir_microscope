@@ -65,8 +65,9 @@ def marker_values_to_binary_data(
     def to_channel_bits(val):
         # Use bit shift to move the bits to the correct
         # value.
-        # If was channel = 2, then starting with 1,
-        # 1<<1 -> 0001 --> 0010
+        # If was channel = 2, then starting with 1, e.g
+        # 1<<1 = 0001 --> 0010
+        # 1<<2 = 0001 --> 0100 .. etc
         return 1 << channel - 1 if val > 0 else 0
 
     idx = 0
